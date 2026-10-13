@@ -10,6 +10,8 @@ The original validator accepted only `db.lagwnyxitcfrdfnuafea.supabase.co` and u
 
 TLS certificate verification, async pool limits, connection recycling, Pacific session settings, and migration locking are preserved. Port 6543, other project usernames, and lookalike domains remain rejected. A raw `!` becomes `%21`; an existing `%21` is not double-encoded. No credential values are committed or printed.
 
+Live verification on October 13, 2026 confirmed the original Render pre-deploy network failure and the direct URI in the backend's private configuration. Supabase's Connect panel supplied `aws-1-ca-central-1.pooler.supabase.com:5432`. Updating the URI and deploying `4ee8ce8` cleared the network error, but exposed a second failure: `SSLCertVerificationError: self-signed certificate in certificate chain`. The backend now adds Supabase's official public root CA from `backend/certs/supabase-ca.crt` to its default trust store, retaining certificate-chain and hostname verification. The Docker image already copies the complete backend directory, including this certificate.
+
 ## Private configuration and deployment sequence
 
 1. Open Supabase project `lagwnyxitcfrdfnuafea`, choose **Connect → Session pooler**, and copy its exact host and username. Do not guess the pooler host from the Render region. Session mode uses port **5432**.
@@ -24,9 +26,12 @@ TLS certificate verification, async pool limits, connection recycling, Pacific s
 
 The local backend suite passed **72 tests**. Added cases cover session-pooler usernames, all accepted PostgreSQL URI schemes, raw/encoded exclamation marks, rejection of transaction pooling/wrong projects/lookalike hosts, and unchanged pool settings. The full existing route, scheduler-related, analytics, cost-control, and ledger tests passed. No frontend or migration implementation was modified.
 
+The database configuration tests also verify that the actual SSL context requires certificate validation, checks hostnames, and trusts the bundled Supabase root CA.
+
 This local result does not prove that Render's private environment was updated or that a cloud deployment succeeded. Record the actual deployed commit, pre-deploy result, migration revision, and health results after cloud verification.
 
 ## Primary documentation
 
 - [Supabase connection methods and Session Pooler URI](https://supabase.com/docs/guides/database/connecting-to-postgres)
+- [Supabase database CA and SSL verification](https://supabase.com/docs/guides/platform/ssl-enforcement)
 - [Render pre-deploy commands](https://render.com/docs/deploys#pre-deploy-command)

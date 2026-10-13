@@ -1,5 +1,6 @@
 import ssl
 import re
+from pathlib import Path
 from urllib.parse import quote, unquote
 from sqlalchemy import make_url
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
@@ -41,8 +42,12 @@ def direct_database_url(raw: str):
 def configure_database(url: str | None = None):
     global engine, Session
     target = direct_database_url(url or settings.db_url)
+    ssl_context = ssl.create_default_context()
+    # Supabase's database/pooler chain uses its published root CA.
+    # Add it to the default trust store while retaining hostname verification.
+    ssl_context.load_verify_locations(cafile=str(Path(__file__).resolve().parents[1] / "certs" / "supabase-ca.crt"))
     engine = create_async_engine(target, pool_size=10, max_overflow=20, pool_recycle=1800,
-        pool_pre_ping=True, pool_timeout=15, connect_args={"ssl": ssl.create_default_context(),
+        pool_pre_ping=True, pool_timeout=15, connect_args={"ssl": ssl_context,
         "timeout": 15, "command_timeout": 20,
         "server_settings": {"timezone": "America/Vancouver", "statement_timeout": "20000"}})
     Session = async_sessionmaker(engine, expire_on_commit=False)

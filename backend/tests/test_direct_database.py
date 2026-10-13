@@ -1,4 +1,6 @@
 import pytest
+import ssl
+from pathlib import Path
 from app import db
 from app.db import direct_database_url
 
@@ -51,14 +53,27 @@ def test_pooler_rejects_transaction_mode_wrong_projects_and_lookalike_hosts(host
     f"postgresql://postgres:dummy%21@{HOST}:5432/postgres",
     "postgresql://postgres.lagwnyxitcfrdfnuafea:dummy%21@aws-1-us-west-2.pooler.supabase.com:5432/postgres",
 ])
-async def test_pool_configuration_without_connecting(uri):
+async def test_pool_configuration_without_connecting(uri, monkeypatch):
     previous_engine, previous_session = db.engine, db.Session
+    original_create_engine = db.create_async_engine
+    captured = {}
+
+    def capture_engine(*args, **kwargs):
+        captured.update(kwargs)
+        return original_create_engine(*args, **kwargs)
+
+    monkeypatch.setattr(db, "create_async_engine", capture_engine)
     try:
         engine = db.configure_database(uri)
         assert engine.pool.size() == 10
         assert engine.pool._max_overflow == 20
         assert engine.pool._recycle == 1800
         assert engine.pool._pre_ping is True
+        tls = captured["connect_args"]["ssl"]
+        assert tls.verify_mode == ssl.CERT_REQUIRED
+        assert tls.check_hostname is True
+        ca_pem = (Path(__file__).resolve().parents[1] / "certs" / "supabase-ca.crt").read_text()
+        assert ssl.PEM_cert_to_DER_cert(ca_pem) in tls.get_ca_certs(binary_form=True)
         await engine.dispose()
     finally:
         db.engine, db.Session = previous_engine, previous_session
