@@ -27,6 +27,7 @@ from app.maths import parse_odds, money, profit, roi, decimal
 from app.model_config import UNIT_VALUE_CAD, GATE_NAMES, INITIAL_BANKROLL_CAD
 from app.ingestion import dirty
 from app.providers import complete_roster
+from app.performance import performance
 
 @asynccontextmanager
 async def lifespan(application):
@@ -123,7 +124,7 @@ async def dashboard(session=Depends(database)):
     return {"bankroll": str(money(initial+net)), "available":str(money(initial+net-exposure)), "exposure":str(money(exposure)),
         "profit":str(money(net)), "roi":str(roi(net,settled)), "unit_value":str(UNIT_VALUE_CAD),
         "source_updated_at":aware(latest) if latest else None, "server_time":now(), "fixtures":[safe_fixture(f) for f in fixtures],
-        "stale":latest is None or now()-aware(latest) > timedelta(minutes=5)}
+        "stale":latest is None or now()-aware(latest) > timedelta(minutes=5), "performance":await performance(session)}
 
 @app.get("/fixtures/{fixture_id}", dependencies=[Depends(authorize)])
 async def fixture_detail(fixture_id: str, session=Depends(database)):
