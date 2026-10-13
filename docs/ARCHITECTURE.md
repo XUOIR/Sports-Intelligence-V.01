@@ -117,4 +117,4 @@ This files-only preparation did not mutate Supabase, contact paid providers, cre
 
 ## Requested delivery files
 
-`backend/main.py` is the complete API entry point and uses the implemented `backend/app/` analytics modules. `backend/requirements.txt` is fully pinned. `frontend/package.json` is pinned to the installed frontend dependencies and declares the build/run/test commands. The database adapter enforces the specified direct Supabase host on port 5432 and normalizes password encoding without logging credentials. The existing `.env` is unchanged.
+`backend/main.py` is the complete API entry point and uses the implemented `backend/app/` analytics modules. `backend/requirements.txt` is fully pinned. `frontend/package.json` is pinned to the installed frontend dependencies and declares the build/run/test commands. The database adapter accepts the configured direct Supabase host or an official Session Pooler host with this project's qualified username on port 5432. It rejects transaction pooling and normalizes password encoding without logging credentials. The existing `.env` is unchanged.

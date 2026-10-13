@@ -12,7 +12,7 @@ for name,value in (("SUPABASE_DB_URL",settings.db_url),("THE_ODDS_API_KEY",setti
 if settings.db_url:
     try:
         direct_database_url(settings.db_url)
-        print("Database connection mode: configured direct Supabase host on port 5432")
+        print("Database connection mode: supported Supabase direct/Session Pooler on port 5432")
     except Exception:
         print('Database connection mode: invalid URL (redacted)')
 print(f"Scheduler: {'enabled' if settings.scheduler else 'disabled'}")

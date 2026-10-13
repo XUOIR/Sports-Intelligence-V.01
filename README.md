@@ -32,7 +32,7 @@ Your existing root `.env` was preserved. No secrets are included in source, buil
 
 Set a random server-only `ADMIN_API_TOKEN` of at least 32 characters and a `DASHBOARD_PASSWORD` of at least 12 characters. The Render blueprint generates these and shares only the internal API token between services. The dashboard uses signed, expiring, HttpOnly, SameSite=Strict cookies, checks mutation origins, limits login attempts, and proxies API requests on the server. No integration token uses `NEXT_PUBLIC_`.
 
-Use the configured **direct Supabase endpoint on port 5432**: `db.lagwnyxitcfrdfnuafea.supabase.co`, username `postgres`, database `postgres`. Passwords are percent-encoded before parsing; existing encoding is preserved without double-encoding. Pooler endpoints and other ports are rejected under the agreed deployment requirements. Never commit `.env`. Only the backend database role should access the tables. Health/liveness endpoints reveal no credentials.
+For Render, copy the **Session Pooler** connection from Supabase's Connect panel: `postgresql://postgres.lagwnyxitcfrdfnuafea:[ENCODED-PASSWORD]@[POOLER-HOST]:5432/postgres`. Use the exact pooler host supplied by Supabase; do not infer it from a region. The configured direct endpoint remains supported with username `postgres`. Both modes require port 5432 and database `postgres`. Passwords are percent-encoded before parsing; existing encoding is preserved without double-encoding. Transaction pooling on port 6543, wrong-project usernames, and unrelated hosts are rejected. Never commit `.env`. Only the backend database role should access the tables. Health/liveness endpoints reveal no credentials.
 
 ## Local setup
 
@@ -59,7 +59,7 @@ In a separate terminal, run `pnpm --dir frontend dev`. Local scheduling defaults
 
 1. Push the source to your own GitHub repository. No repository was created or uploaded during preparation.
 2. In Render, create a Blueprint from `render.yaml`. It declares two always-on `0.5c-512mb` services in Oregon, one instance each. API migrations execute before deploy; the scheduler runs inside the single FastAPI process. Automatic redeployment is disabled.
-3. Enter the four integration secrets in Render. Use the configured direct PostgreSQL connection on port 5432, not a pooler or the HTTPS Data API URL. Review your Supabase connection capacity for the requested maximum of 30 backend connections.
+3. Enter the four integration secrets in Render. Use Supabase's IPv4-compatible Session Pooler on port 5432, with the project-qualified username, rather than a direct IPv6 endpoint or the HTTPS Data API URL. Review your Supabase connection capacity for the requested maximum of 30 backend connections.
 4. Retrieve the generated dashboard password from Render's environment settings. The frontend reaches the backend through Render's internal host, and the API token stays on the servers.
 5. Verify `/health/ready`, inspect the first successful provider ingestions, verify source field contracts and bookmaker coverage, and confirm the dashboard's data times and HOLD/WATCH behavior before relying on it.
 6. Add monitoring, backups, and provider account spending limits appropriate to your uptime requirement. Render's current entry compute pricing is approximately **USD 14/month for two services**, excluding Supabase and third-party accounts. Recheck pricing before deployment.
@@ -101,3 +101,7 @@ See `docs/QA_REPORT.md` for the exact checks performed and outstanding productio
 - [Supabase connection methods](https://supabase.com/docs/guides/database/connecting-to-postgres)
 - [Render blueprint specification](https://render.com/docs/blueprint-spec) and [pricing](https://render.com/pricing)
 - [B.C. Pacific time change in 2026](https://archive.news.gov.bc.ca/releases/news_releases_2024-2028/2026CITZ0009-001073.htm)
+
+## Failed Render pre-deploy recovery
+
+See [deployment recovery](docs/DEPLOYMENT_RECOVERY.md). The Alembic pre-deploy step is preserved; the connection validator now supports this project's Session Pooler without changing routes, scheduling, analytics, or the dashboard.
