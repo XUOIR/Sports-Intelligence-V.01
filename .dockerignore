@@ -1,0 +1,11 @@
+.env
+.env.*
+.git
+.venv
+.pnpm-store
+**/node_modules
+**/.next
+**/__pycache__
+**/.pytest_cache
+**/*.egg-info
+artifacts

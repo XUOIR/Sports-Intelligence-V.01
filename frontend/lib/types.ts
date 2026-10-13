@@ -1,0 +1,5 @@
+export type Fixture = {id:string;sport:string;home:string;away:string;commence_time:string;state:'WATCH'|'HOLD'|'PASS'|'RECOMMEND';dirty:boolean;probability:string|null;edge:string|null;target_price:string|null;suggested_stake:string;selection:string|null;reason:string;gates:Record<string,boolean>;metrics:Record<string,unknown>;risk_assessment:Record<string,unknown>};
+export type Quote = {id:number;bookmaker:string;market:string;selection:string;line:string|null;decimal_odds:string;implied_probability:string;source_at:string};
+export type Detail = {fixture:Fixture;odds:Quote[];snapshot:{anchor_at:string;vector:number[]}|null};
+export type Overview = {bankroll:string;available:string;exposure:string;profit:string;roi:string;unit_value:string;source_updated_at:string|null;server_time:string;fixtures:Fixture[];stale:boolean};
+export type Bet = {id:string;fixture_id:string;selection:string;market:string;line:string|null;odds_taken:string;stake_cad:string;unit_size_at_execution:string;outcome:string;profit_cad:string;created_at:string};

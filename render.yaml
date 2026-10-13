@@ -1,0 +1,62 @@
+services:
+  - type: web
+    name: sports-intelligence-api
+    runtime: docker
+    plan: 0.5c-512mb
+    region: oregon
+    numInstances: 1
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health/ready
+    preDeployCommand: python -m alembic upgrade head
+    autoDeployTrigger: off
+    envVars:
+      - key: SUPABASE_DB_URL
+        sync: false
+      - key: THE_ODDS_API_KEY
+        sync: false
+      - key: ESPORTS_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: ADMIN_API_TOKEN
+        generateValue: true
+      - key: ENABLE_SCHEDULER
+        value: "true"
+      - key: ODDS_DAILY_CREDITS
+        value: "120"
+      - key: PANDASCORE_DAILY_REQUESTS
+        value: "120"
+      - key: LLM_DAILY_REQUESTS
+        value: "12"
+      - key: NHL_DAILY_REQUESTS
+        value: "100"
+      - key: TZ
+        value: America/Vancouver
+  - type: web
+    name: sports-intelligence-dashboard
+    runtime: docker
+    plan: 0.5c-512mb
+    region: oregon
+    numInstances: 1
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: .
+    healthCheckPath: /
+    autoDeployTrigger: off
+    envVars:
+      - key: BACKEND_HOST
+        fromService:
+          type: web
+          name: sports-intelligence-api
+          property: host
+      - key: BACKEND_PORT
+        value: "10000"
+      - key: ADMIN_API_TOKEN
+        fromService:
+          type: web
+          name: sports-intelligence-api
+          envVarKey: ADMIN_API_TOKEN
+      - key: DASHBOARD_PASSWORD
+        generateValue: true
+      - key: TZ
+        value: America/Vancouver
