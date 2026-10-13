@@ -47,6 +47,17 @@ class SafeHTTP:
                                     await self.guard.trip(provider, 86400)
                                 raise ProviderError(f"{provider} rejected request ({status})")
                             if 300 <= status < 400:
+                                # NHL's public /now endpoints redirect to dated/season URLs.
+                                # Keep every hop on the official HTTPS API and within
+                                # the existing three-request deadline and budget caps.
+                                location = response.headers.get("location")
+                                if provider == "nhl" and method.upper() == "GET" and location:
+                                    destination = response.url.join(location)
+                                    if (destination.scheme == "https" and destination.host == "api-web.nhle.com"
+                                            and destination.port in (None, 443) and not destination.userinfo
+                                            and destination.path.startswith("/v1/")):
+                                        url = str(destination)
+                                        continue
                                 raise ProviderError("Upstream redirect rejected")
                             if provider == "odds" and response.headers.get("x-requests-remaining") == "0":
                                 await self.guard.trip(provider, 86400)

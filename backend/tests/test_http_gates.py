@@ -16,6 +16,54 @@ class Guard:
     async def trip(self,*args):self.tripped=True
     async def llm_attempt(self,*args):self.attempts+=1
 
+@pytest.mark.parametrize('location', [
+    'https://api-web.nhle.com/v1/standings/2026-10-13',
+    '/v1/standings/2026-10-13',
+])
+async def test_nhl_public_redirect_is_followed_and_both_requests_are_budgeted(location):
+    seen = []
+    def respond(request):
+        seen.append(str(request.url))
+        if request.url.path.endswith('/now'):
+            return httpx.Response(307, headers={'Location': location})
+        return httpx.Response(200, json={'standings': []})
+    guard = Guard()
+    client = SafeHTTP(guard, httpx.MockTransport(respond))
+    assert await client.request('nhl', 'GET', 'https://api-web.nhle.com/v1/standings/now') == {'standings': []}
+    assert seen == ['https://api-web.nhle.com/v1/standings/now', 'https://api-web.nhle.com/v1/standings/2026-10-13']
+    assert guard.calls == 2
+
+@pytest.mark.parametrize('location', [
+    'https://example.test/v1/standings/2026-10-13',
+    'https://api-web.nhle.com.attacker.example/v1/standings/2026-10-13',
+    'http://api-web.nhle.com/v1/standings/2026-10-13',
+    'https://api-web.nhle.com:444/v1/standings/2026-10-13',
+    'https://user@api-web.nhle.com/v1/standings/2026-10-13',
+    'https://api-web.nhle.com/private',
+    '',
+])
+async def test_nhl_redirect_cannot_leave_the_public_official_api(location):
+    guard = Guard()
+    client = SafeHTTP(guard, httpx.MockTransport(lambda request: httpx.Response(307, headers={'Location': location})))
+    with pytest.raises(ProviderError):
+        await client.request('nhl', 'GET', 'https://api-web.nhle.com/v1/standings/now')
+    assert guard.calls == 1
+
+async def test_nhl_redirect_loop_is_bounded_by_existing_request_cap():
+    guard = Guard()
+    client = SafeHTTP(guard, httpx.MockTransport(lambda request: httpx.Response(307, headers={'Location': '/v1/standings/now'})))
+    with pytest.raises(ProviderError):
+        await client.request('nhl', 'GET', 'https://api-web.nhle.com/v1/standings/now')
+    assert guard.calls == 3
+
+@pytest.mark.parametrize('provider,method', [('odds','GET'), ('pandascore','GET'), ('openrouter','POST'), ('nhl','POST')])
+async def test_paid_api_and_non_get_redirects_remain_rejected(provider, method):
+    guard = Guard()
+    client = SafeHTTP(guard, httpx.MockTransport(lambda request: httpx.Response(307, headers={'Location': 'https://api-web.nhle.com/v1/standings/2026-10-13'})))
+    with pytest.raises(ProviderError):
+        await client.request(provider, method, 'https://example.test')
+    assert guard.calls == 1
+
 async def test_openrouter_503_never_retries_and_circuit_opens():
     guard=Guard();client=SafeHTTP(guard,httpx.MockTransport(lambda r:httpx.Response(503)))
     with pytest.raises(ProviderError):await client.request('openrouter','POST','https://example.test',cycle_id='x')

@@ -28,6 +28,12 @@ The local backend suite passed **72 tests**. Added cases cover session-pooler us
 
 The database configuration tests also verify that the actual SSL context requires certificate validation, checks hostnames, and trusts the bundled Supabase root CA.
 
+After the user corrected the private database password, Render successfully deployed `bd0bba1`; pre-deploy completed, both backend health endpoints returned HTTP 200, and Supabase confirmed revision `0001` with CAD 1,100.00 initial capital. Resuming the existing Blueprint created and deployed the dashboard on the configured plan. Its root returned HTTP 200, unauthenticated data requests returned HTTP 401, and login loaded the bankroll and empty wager ledger.
+
+The first NHL startup sync stopped at a separate `ProviderError`: the official `/v1/standings/now` and `/v1/club-schedule-season/TOR/now` endpoints returned HTTP 307 redirects to dated/season-specific URLs. The HTTP client now permits bounded public NHL GET redirects only to HTTPS `api-web.nhle.com`, default port, no URL user information, and the `/v1/` path. Every hop consumes the existing request budget and three-request/total-time caps. Paid API redirects and NHL non-GET redirects remain rejected. Tests cover valid absolute/relative redirects, external/lookalike hosts, HTTPS downgrade, alternate ports, user information, unexpected paths, missing locations, loops, and paid API safeguards.
+
+The full backend suite, including the NHL redirect fix, passed **86 tests**. Redirect tests use mocked responses and make no paid upstream requests.
+
 This local result does not prove that Render's private environment was updated or that a cloud deployment succeeded. Record the actual deployed commit, pre-deploy result, migration revision, and health results after cloud verification.
 
 ## Primary documentation
