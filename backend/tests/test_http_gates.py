@@ -11,9 +11,11 @@ from app.providers import complete_roster,BOOKMAKER_ALIASES
 
 class Guard:
     def __init__(self):self.calls=0;self.tripped=False;self.attempts=0
-    async def reserve(self,*args):self.calls+=1
+    async def reserve(self,*args,**kwargs):
+        self.calls+=1
+        if kwargs.get('cycle_id'):self.attempts+=1
     async def blocked(self,*args):return self.tripped
-    async def trip(self,*args):self.tripped=True
+    async def trip(self,*args,**kwargs):self.tripped=True
     async def llm_attempt(self,*args):self.attempts+=1
 
 @pytest.mark.parametrize('location', [
@@ -75,7 +77,7 @@ async def test_429_retries_are_bounded(monkeypatch):
     async def no_sleep(*args):pass
     monkeypatch.setattr('app.http.asyncio.sleep',no_sleep)
     guard=Guard();client=SafeHTTP(guard,httpx.MockTransport(lambda r:httpx.Response(429,headers={'Retry-After':'0'})))
-    with pytest.raises(ProviderError):await client.request('odds','GET','https://example.test',cost=3)
+    with pytest.raises(ProviderError):await client.request('nhl','GET','https://example.test')
     assert guard.calls==3 and guard.tripped
 
 async def test_payload_cap_and_bad_json():

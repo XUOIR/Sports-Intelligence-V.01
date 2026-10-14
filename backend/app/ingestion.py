@@ -1,6 +1,7 @@
 import hashlib
 import logging
 import re
+import unicodedata
 from datetime import timedelta
 from sqlalchemy import select
 from . import db, providers
@@ -9,6 +10,8 @@ from .models import Fixture, Evidence, MarketOdds, State, Snapshot, AuditLog
 from .maths import implied, parse_odds, decimal
 from .model_config import SHARP_MOVEMENT
 from .features import eligible_history
+from .config import settings
+from .limits import limits
 
 log = logging.getLogger("ingestion")
 
@@ -20,7 +23,7 @@ def name(value):
     return value.strip()
 
 def normalized(value):
-    return re.sub(r"[^a-z0-9]", "", name(value).casefold())
+    return re.sub(r"[^a-z0-9]", "", unicodedata.normalize('NFKD',name(value).casefold()))
 
 def quote_identity(bookmaker, market, selection, line):
     if market not in {"h2h","spreads","totals"} or (market == "h2h") != (line is None):
@@ -74,6 +77,7 @@ async def ingest_nhl(history=False):
     games, standings = await providers.nhl_schedule(), await providers.nhl_standings()
     by_abbrev = {name(s["teamAbbrev"]): s for s in standings}
     histories = {}
+    history_times = {}
     if history:
         for game in games:
             try:
@@ -82,7 +86,9 @@ async def ingest_nhl(history=False):
                 for side in ("homeTeam","awayTeam"):
                     abbreviation = game[side]["abbrev"]
                     if abbreviation not in histories and len(histories)<40:
-                        histories[abbreviation] = await providers.nhl_history(abbreviation)
+                        histories[abbreviation] = await providers.nhl_history(abbreviation,game.get('season'))
+                        cached=await limits.observation(f"nhl-history:{abbreviation}:{game.get('season') or 'now'}",max_age=4*3600)
+                        history_times[abbreviation]=aware(cached['source_at']) if cached else now()
             except (ValueError,KeyError,TypeError):
                 log.warning("NHL schedule team structure changed")
     async with db.Session() as session:
@@ -130,7 +136,7 @@ async def ingest_nhl(history=False):
                             won = row["homeTeam"]["score"] > row["awayTeam"]["score"]
                             finished.append({"started_at": started.isoformat(), "ended_at": ended.isoformat(), "win": won if is_home else not won})
                         payload[side] = eligible_history(finished, start)[:10]
-                    evidence(session, fixture, "history", payload)
+                    evidence(session, fixture, "history", payload,at=min(history_times[home['abbrev']],history_times[away['abbrev']]))
                 fixture.updated_at = now()
             except (KeyError, ValueError, TypeError) as exc:
                 log.warning("NHL payload structure changed: %s", type(exc).__name__)
@@ -138,6 +144,7 @@ async def ingest_nhl(history=False):
 
 async def ingest_esports():
     for sport in providers.ESPORTS:
+        if sport not in settings.active_sports:continue
         upcoming = await providers.esports_matches(sport)
         if not upcoming:
             continue
@@ -200,6 +207,11 @@ async def ingest_esports():
 async def ingest_odds():
     reevaluate = set()
     for sport in providers.ODDS_SPORTS:
+        if sport not in settings.active_sports:continue
+        async with db.Session() as session:
+            scheduled=await session.scalar(select(Fixture.id).where(Fixture.sport==sport,
+                Fixture.commence_time>now(),Fixture.commence_time<=now()+timedelta(hours=48)).limit(1))
+        if sport=='NHL' and not scheduled:continue
         rows = await providers.odds(sport)
         async with db.Session() as session:
             for row in rows:
@@ -210,6 +222,9 @@ async def ingest_odds():
                     matching = [f for f in candidates if normalized(f.home) == normalized(row["home_team"]) and normalized(f.away) == normalized(row["away_team"])]
                     if len(matching) > 1:
                         raise ValueError("Ambiguous provider fixture mapping")
+                    if sport=='NHL' and not matching:
+                        log.warning('NHL odds could not be matched to an official fixture; row discarded')
+                        continue
                     fixture = matching[0] if matching else await session.get(Fixture, f"odds:{row['id']}")
                     if fixture is None:
                         fixture = Fixture(id=f"odds:{row['id']}", sport=sport, home=name(row["home_team"]), away=name(row["away_team"]), commence_time=start)
@@ -224,13 +239,14 @@ async def ingest_odds():
                             key = market["key"]
                             if key not in {"h2h","spreads","totals"}:
                                 continue
-                            if key == "h2h" and (len(market.get("outcomes",[])) != 2 or {o.get("name") for o in market["outcomes"]} != {fixture.home,fixture.away}):
+                            if key == "h2h" and (len(market.get("outcomes",[])) != 2 or {normalized(o.get("name",'')) for o in market["outcomes"]} != {normalized(fixture.home),normalized(fixture.away)}):
                                 continue
                             for outcome in providers.array(market, "outcomes", 4):
                                 try:
                                     price = parse_odds(outcome["price"], "decimal")
                                     line = decimal(outcome["point"]) if key != "h2h" else None
                                     selection = name(outcome["name"])
+                                    selection = next((team for team in (fixture.home,fixture.away) if normalized(selection)==normalized(team)),selection)
                                     if key == "h2h" and selection not in {fixture.home, fixture.away}:
                                         continue  # Draw / three-way moneyline cannot use binary model.
                                     source_at = aware(market.get("last_update") or book["last_update"])
@@ -284,6 +300,7 @@ async def ingest_results():
                 log.warning("NHL result payload changed for %s", fixture.id)
         await session.commit()
     for sport in providers.ESPORTS:
+        if sport not in settings.active_sports:continue
         async with db.Session() as session:
             unresolved=(await session.scalars(select(Fixture).where(Fixture.sport==sport,Fixture.commence_time<now(),
                 Fixture.commence_time>now()-timedelta(days=3),Fixture.final_home_win.is_(None)).limit(50))).all()

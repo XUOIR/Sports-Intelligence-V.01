@@ -228,3 +228,46 @@ REVOKE ALL ON TABLE "personal_bets" FROM anon, authenticated;
 ALTER TABLE "source_evidence" ENABLE ROW LEVEL SECURITY;
 
 REVOKE ALL ON TABLE "source_evidence" FROM anon, authenticated;
+
+
+
+CREATE TABLE provider_calls (
+	id VARCHAR(64) NOT NULL,
+	provider VARCHAR(30) NOT NULL,
+	fixture_id VARCHAR(100),
+	units INTEGER NOT NULL,
+	reserved_usd NUMERIC(12, 6) NOT NULL,
+	status VARCHAR(20) NOT NULL,
+	error_category VARCHAR(100),
+	response_metadata JSON NOT NULL,
+	created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+	updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
+	PRIMARY KEY (id),
+	CHECK (units > 0 AND reserved_usd >= 0)
+)
+
+;
+
+CREATE INDEX ix_provider_calls_created_at ON provider_calls (created_at);
+
+CREATE INDEX ix_provider_calls_fixture_id ON provider_calls (fixture_id);
+
+CREATE INDEX ix_provider_calls_provider ON provider_calls (provider);
+
+ALTER TABLE "provider_calls" ENABLE ROW LEVEL SECURITY;
+
+REVOKE ALL ON TABLE "provider_calls" FROM anon, authenticated;
+
+
+CREATE TABLE provider_state (
+	provider VARCHAR(30) NOT NULL,
+	observed_at TIMESTAMP WITH TIME ZONE NOT NULL,
+	info JSON NOT NULL,
+	PRIMARY KEY (provider)
+)
+
+;
+
+ALTER TABLE "provider_state" ENABLE ROW LEVEL SECURITY;
+
+REVOKE ALL ON TABLE "provider_state" FROM anon, authenticated;

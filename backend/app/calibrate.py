@@ -7,7 +7,7 @@ from pathlib import Path
 from . import db
 from .clock import aware
 from .models import ModelValidation
-from .model_config import MODEL_VERSION
+from .model_config import MODEL_VERSION,baseline_digest
 from .maths import calibrated, decimal
 from .maths import baseline
 from .features import validate_source,frozen_vector
@@ -55,7 +55,7 @@ async def main():
     test_score = brier([calibrated(r["probability"],params) for r in test],[r["outcome"] for r in test])
     prevalence = sum(r["outcome"] for r in training)/len(training)
     reference = brier([prevalence]*len(test),[r["outcome"] for r in test])
-    report = {"baseline_version":MODEL_VERSION,"train_records":len(training),"calibration_records":len(calibration),"test_records":len(test),
+    report = {"baseline_version":MODEL_VERSION,"baseline_digest":baseline_digest(args.sport),"train_records":len(training),"calibration_records":len(calibration),"test_records":len(test),
         "embargo_dates":[str(d) for d in embargoes],"train_brier":str(brier([r["probability"] for r in training],[r["outcome"] for r in training])),
         "test_brier":str(test_score),"reference_brier":str(reference),"test_through":max(aware(r["commence_time"]) for r in test).isoformat(),
         "passing":test_score < reference}

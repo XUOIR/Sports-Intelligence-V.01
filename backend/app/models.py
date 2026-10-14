@@ -140,6 +140,26 @@ class RuntimeLimit(Base):
     used: Mapped[int] = mapped_column(default=0)
     blocked_until: Mapped[datetime | None] = mapped_column(PacificTimestamp())
 
+class ProviderCall(Base):
+    __tablename__ = 'provider_calls'
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    provider: Mapped[str] = mapped_column(String(30), index=True)
+    fixture_id: Mapped[str | None] = mapped_column(String(100), index=True)
+    units: Mapped[int] = mapped_column()
+    reserved_usd: Mapped[Decimal] = mapped_column(Numeric(12,6), default=0)
+    status: Mapped[str] = mapped_column(String(20), default='STARTED')
+    error_category: Mapped[str | None] = mapped_column(String(100))
+    response_metadata: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(PacificTimestamp(), default=now, index=True)
+    updated_at: Mapped[datetime] = mapped_column(PacificTimestamp(), default=now)
+    __table_args__ = (CheckConstraint('units > 0 AND reserved_usd >= 0'),)
+
+class ProviderState(Base):
+    __tablename__ = 'provider_state'
+    provider: Mapped[str] = mapped_column(String(30), primary_key=True)
+    observed_at: Mapped[datetime] = mapped_column(PacificTimestamp(), default=now)
+    info: Mapped[dict] = mapped_column(JSON, default=dict)
+
 class JobLease(Base):
     __tablename__ = "job_leases"
     key: Mapped[str] = mapped_column(String(100), primary_key=True)

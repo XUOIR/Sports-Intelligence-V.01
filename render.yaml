@@ -25,12 +25,22 @@ services:
         value: "true"
       - key: ODDS_DAILY_CREDITS
         value: "120"
+      - key: ODDS_MONTHLY_CREDITS
+        value: "500"
+      - key: ACTIVE_SPORTS
+        value: NHL
       - key: PANDASCORE_DAILY_REQUESTS
-        value: "120"
+        value: "0"
       - key: LLM_DAILY_REQUESTS
         value: "12"
+      - key: LLM_DAILY_USD
+        value: "0"
+      - key: LLM_MONTHLY_USD
+        value: "0"
+      - key: LLM_REQUEST_USD
+        value: "0.01"
       - key: NHL_DAILY_REQUESTS
-        value: "100"
+        value: "300"
       - key: TZ
         value: America/Vancouver
   - type: web

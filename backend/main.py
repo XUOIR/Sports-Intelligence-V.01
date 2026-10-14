@@ -13,10 +13,11 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from decimal import Decimal
 from uuid import UUID
+from urllib.parse import parse_qs,urlsplit
 from fastapi import FastAPI, Depends, HTTPException, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field, ConfigDict, field_validator
+from pydantic import BaseModel, Field, ConfigDict, field_validator,StrictBool,HttpUrl
 from sqlalchemy import select, func, text
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from app import db
@@ -28,6 +29,10 @@ from app.model_config import UNIT_VALUE_CAD, GATE_NAMES, INITIAL_BANKROLL_CAD
 from app.ingestion import dirty
 from app.providers import complete_roster
 from app.performance import performance
+from app.readiness import fresh_recommendation
+from app.operations import operational_status
+from app.limits import limits
+from app.allowances import provider_allowances
 
 @asynccontextmanager
 async def lifespan(application):
@@ -36,9 +41,11 @@ async def lifespan(application):
         if settings.db_url:
             db.configure_database()
         if settings.scheduler:
-            required = (settings.db_url, settings.odds_key, settings.esports_key, settings.router_key)
+            required = (settings.db_url, settings.odds_key)
+            if set(settings.active_sports)&{'CS2','VAL','LOL'}:
+                required += (settings.esports_key,)
             if not all(required) or len(settings.admin_token) < 32:
-                raise RuntimeError('Scheduler requires all integration credentials and a valid ADMIN_API_TOKEN')
+                raise RuntimeError('Scheduler requires credentials for active sports and a valid ADMIN_API_TOKEN')
             from app.scheduler import start, scheduler
             start()
             running_scheduler = scheduler
@@ -97,7 +104,7 @@ def serialize(row):
 
 def safe_fixture(fixture):
     data = serialize(fixture)
-    if fixture.state == State.RECOMMEND and (fixture.dirty or aware(fixture.commence_time) <= now() or now()-aware(fixture.updated_at) > timedelta(minutes=5)):
+    if fixture.state == State.RECOMMEND and (fixture.sport not in settings.active_sports or not fresh_recommendation(fixture)):
         data.update(state="HOLD", suggested_stake=0, reason="Fresh re-verification required")
     return data
 
@@ -119,12 +126,41 @@ async def dashboard(session=Depends(database)):
     net = await session.scalar(select(func.coalesce(func.sum(PersonalBet.profit_cad),0)))
     exposure = await session.scalar(select(func.coalesce(func.sum(PersonalBet.stake_cad),0)).where(PersonalBet.outcome == Outcome.PENDING))
     settled = await session.scalar(select(func.coalesce(func.sum(PersonalBet.stake_cad),0)).where(PersonalBet.outcome.in_([Outcome.WIN,Outcome.LOSS,Outcome.PUSH])))
-    fixtures = (await session.scalars(select(Fixture).where(Fixture.commence_time >= now()-timedelta(hours=12)).order_by(Fixture.commence_time).limit(200))).all()
-    latest = await session.scalar(select(func.max(MarketOdds.source_at)))
+    fixtures = (await session.scalars(select(Fixture).where(Fixture.sport.in_(settings.active_sports),Fixture.commence_time >= now()-timedelta(hours=12)).order_by(Fixture.commence_time).limit(200))).all()
+    latest = await session.scalar(select(func.max(MarketOdds.source_at)).join(Fixture,MarketOdds.fixture_id==Fixture.id)
+        .where(Fixture.sport.in_(settings.active_sports),MarketOdds.source_at<=now()))
     return {"bankroll": str(money(initial+net)), "available":str(money(initial+net-exposure)), "exposure":str(money(exposure)),
         "profit":str(money(net)), "roi":str(roi(net,settled)), "unit_value":str(UNIT_VALUE_CAD),
         "source_updated_at":aware(latest) if latest else None, "server_time":now(), "fixtures":[safe_fixture(f) for f in fixtures],
-        "stale":latest is None or now()-aware(latest) > timedelta(minutes=5), "performance":await performance(session)}
+        "stale":latest is None or now()-aware(latest) > timedelta(minutes=5), "performance":await performance(session),
+        "active_sports":list(settings.active_sports),"operations":await operational_status(session)}
+
+@app.get('/operations',dependencies=[Depends(authorize)])
+async def operations(session=Depends(database)):
+    return await operational_status(session)
+
+@app.post('/operations/allowances',dependencies=[Depends(authorize)])
+async def allowances():
+    return {'providers':await provider_allowances()}
+
+class PauseInput(BaseModel):
+    model_config=ConfigDict(extra='forbid')
+    paused:StrictBool
+
+@app.patch('/operations/pause',dependencies=[Depends(authorize)])
+async def paid_pause(body:PauseInput):
+    await limits.pause(body.paused)
+    return {'paid_paused':body.paused}
+
+class ResumeInput(BaseModel):
+    model_config=ConfigDict(extra='forbid')
+    provider:str
+
+@app.post('/operations/resume',dependencies=[Depends(authorize)])
+async def provider_resume(body:ResumeInput):
+    try:await limits.resume(body.provider)
+    except ValueError as exc:raise HTTPException(422,str(exc)) from None
+    return {'provider':body.provider,'resumed':True}
 
 @app.get("/fixtures/{fixture_id}", dependencies=[Depends(authorize)])
 async def fixture_detail(fixture_id: str, session=Depends(database)):
@@ -225,12 +261,24 @@ class EvidenceInput(BaseModel):
     source_at: datetime
     source_reference: str = Field(min_length=10,max_length=300)
     factors: dict[str, Decimal]
-    personnel_confirmed: bool
-    other_markets_verified: bool
-    opposing_case_verified: bool
-    maps_veto_verified: bool = False
+    personnel_confirmed: StrictBool
+    other_markets_verified: StrictBool
+    opposing_case_verified: StrictBool
+    maps_veto_verified: StrictBool = False
     home_players: list[dict] | None = None
     away_players: list[dict] | None = None
+    home_goalie:str|None=Field(default=None,min_length=2,max_length=100)
+    away_goalie:str|None=Field(default=None,min_length=2,max_length=100)
+
+    @field_validator('source_reference')
+    @classmethod
+    def source_url(cls,value):
+        url=HttpUrl(value)
+        if url.scheme!='https' or url.username or url.password:
+            raise ValueError('Use a public HTTPS evidence URL without credentials')
+        if any(key.lower().replace('_','') in {'key','apikey','token','password','auth','accesstoken'} for key in parse_qs(urlsplit(str(url)).query)):
+            raise ValueError('Evidence URLs must not contain credentials or access tokens')
+        return str(url)
 
 @app.post("/fixtures/{fixture_id}/evidence", dependencies=[Depends(authorize)])
 async def verified_evidence(fixture_id: str, body: EvidenceInput, session=Depends(database)):
@@ -245,6 +293,10 @@ async def verified_evidence(fixture_id: str, body: EvidenceInput, session=Depend
         fixture = await session.get(Fixture,fixture_id,with_for_update=True)
         if not fixture:
             raise HTTPException(404,"Fixture not found")
+        if fixture.sport not in settings.active_sports or aware(fixture.commence_time)<=now():
+            raise HTTPException(409,'Evidence is accepted only for an upcoming active-sport fixture')
+        if fixture.sport=='NHL' and body.personnel_confirmed and (not body.home_goalie or not body.away_goalie):
+            raise HTTPException(422,'Record both starting-goalie names with the confirmation source')
         try:
             baseline(fixture.sport,body.factors)
         except ValueError as exc:
@@ -253,11 +305,14 @@ async def verified_evidence(fixture_id: str, body: EvidenceInput, session=Depend
         if fixture.sport != "NHL" and not roster_ok:
             body.personnel_confirmed = False
         # New factors may be collected before the anchor only. Frozen probability never changes later.
+        if now()>=aware(fixture.commence_time)-timedelta(minutes=30) and {k:float(v) for k,v in body.factors.items()}!=fixture.metrics.get('factors',{}):
+            raise HTTPException(409,'The factor inputs are frozen at T−30; changed or missing factors cannot be backfilled')
         factors = fixture.metrics.get("factors",{}) if now() >= aware(fixture.commence_time)-timedelta(minutes=30) else {k:float(v) for k,v in body.factors.items()}
         if now() < aware(fixture.commence_time)-timedelta(minutes=30):
             session.add(Evidence(fixture_id=fixture_id,kind="model_factors",source_at=source,observed_at=now(),payload=factors))
         fixture.metrics = {**fixture.metrics, "factors":factors,"personnel_confirmed":body.personnel_confirmed,
             "confirmed_at":source.isoformat(), "roster_complete":roster_ok,
+            "goalie_confirmations":{'home':body.home_goalie,'away':body.away_goalie} if fixture.sport=='NHL' else fixture.metrics.get('goalie_confirmations',{}),
             "other_markets_verified":body.other_markets_verified,"opposing_case_verified":body.opposing_case_verified,
             "maps_veto_verified":body.maps_veto_verified,"source_reference":body.source_reference}
         dirty(fixture,"Verified evidence changed; re-evaluation required")

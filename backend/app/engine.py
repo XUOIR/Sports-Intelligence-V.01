@@ -9,10 +9,12 @@ from .clock import aware, now
 from .models import Fixture, Evidence, Snapshot, State, MarketOdds, PersonalBet, Outcome, Account, EvaluationCycle, ModelValidation
 from .features import frozen_vector, validate_source
 from .maths import baseline, decimal, calibrated, stake
-from .model_config import MODEL_VERSION, MIN_EDGE, GATE_NAMES, MAX_OPEN_EXPOSURE
+from .model_config import MODEL_VERSION, MIN_EDGE, GATE_NAMES, MAX_OPEN_EXPOSURE, baseline_digest
 from .providers import doublecheck
 from .http import ProviderError
 from .limits import limits, BudgetExceeded
+from .config import settings
+from .readiness import validated_model
 
 async def freeze(fixture_id: str):
     async with db.Session.begin() as session:
@@ -81,11 +83,12 @@ async def evaluate(fixture_id: str):
         return
     async with db.Session() as session:
         fixture = await session.get(Fixture, fixture_id)
-        if not fixture or aware(fixture.commence_time) <= now():
+        if not fixture or fixture.sport not in settings.active_sports or aware(fixture.commence_time) <= now():
             return
         snapshot = await session.get(Snapshot, fixture_id)
         if not snapshot or aware(snapshot.anchor_at) != aware(fixture.commence_time)-timedelta(minutes=30) or not timedelta(0)<=aware(snapshot.collected_at)-aware(snapshot.anchor_at)<=timedelta(seconds=5):
             fixture.state, fixture.reason, fixture.suggested_stake = State.HOLD, "Awaiting valid frozen anchor", 0
+            fixture.selection,fixture.probability,fixture.edge,fixture.target_price=None,None,None,None
             await session.commit()
             return
         metrics = fixture.metrics
@@ -107,10 +110,7 @@ async def evaluate(fixture_id: str):
             complete=[]
         model = await session.scalar(select(ModelValidation).where(ModelValidation.sport == fixture.sport,
             ModelValidation.approved.is_(True)).order_by(ModelValidation.created_at.desc()).limit(1))
-        probability_ok = bool(model and aware(model.created_at) <= aware(snapshot.anchor_at) and snapshot.model_version == MODEL_VERSION and snapshot.baseline_home_probability is not None
-            and model.report.get("baseline_version") == MODEL_VERSION and
-            timedelta(0) <= now()-aware(model.created_at) <= timedelta(days=90) and
-            aware(model.report["test_through"]).date() < snapshot.game_date)
+        probability_ok = validated_model(model,snapshot)
         p_home = calibrated(snapshot.baseline_home_probability, model.parameters) if probability_ok else None
         if p_home is not None:
             snapshot.prediction_home_probability = p_home
@@ -139,16 +139,20 @@ async def evaluate(fixture_id: str):
             fixture.selection, fixture.probability, fixture.edge = quote.selection, p, edge
             fixture.target_price = 1/(p-MIN_EDGE) if p > MIN_EDGE else None
         else:
-            fixture.probability, fixture.edge, fixture.target_price = None, None, None
+            fixture.selection, fixture.probability, fixture.edge, fixture.target_price = None, None, None, None
         # AI can veto factual gates, never supply them. No paid call until every deterministic gate passes.
         revision = fixture.revision
-        cycle_id = hashlib.sha256(json.dumps([fixture_id, snapshot.anchor_at.isoformat(), revision,
-            chosen[0].id if chosen else None, model.version if model else None], separators=(",", ":")).encode()).hexdigest()
+        cycle_id = hashlib.sha256(json.dumps([fixture_id,snapshot.anchor_at.isoformat(),model.version if model else None,
+            [chosen[0].bookmaker,chosen[0].market,chosen[0].selection,str(chosen[0].decimal_odds)] if chosen else None,
+            snapshot.context.get('factors',{}),metrics.get('source_reference'),metrics.get('goalie_confirmations',{}),gates],
+            sort_keys=True,separators=(",", ":")).encode()).hexdigest()
         if chosen and all(gates.values()):
             await session.execute(insert(EvaluationCycle).values(id=cycle_id, fixture_id=fixture_id, llm_attempts=0).on_conflict_do_nothing())
             await session.commit()  # Persist budget identity before invoking a paid provider.
             cycle = await session.get(EvaluationCycle, cycle_id)
             try:
+                if cycle.report and cycle.report.get('failed'):
+                    raise ProviderError('Earlier paid review failed; automatic repetition disabled')
                 report = cycle.report or await doublecheck(fixture, chosen[1], chosen[0], cycle_id, gates)
                 cycle.report = report
                 fixture.risk_assessment = report
@@ -156,6 +160,9 @@ async def evaluate(fixture_id: str):
                 gates["other_markets"] = gates["other_markets"] and report["other_markets_verified"]
                 gates["maps_veto"] = gates["maps_veto"] and (fixture.sport == "NHL" or report["veto_verified"])
             except (ProviderError, BudgetExceeded) as exc:
+                await session.refresh(cycle)
+                if cycle.llm_attempts:
+                    cycle.report={'failed':True,'error':type(exc).__name__}
                 gates["opposing_case"] = False
                 fixture.risk_assessment = {"error":str(exc)[:300]}
             await session.refresh(fixture)  # Recheck evidence changes while waiting on network.
@@ -170,6 +177,8 @@ async def evaluate(fixture_id: str):
             gates["personnel"]=False
             personnel=False
         fixture.gates = gates
+        fixture.metrics={**fixture.metrics,'recommendation_verified_at':now().isoformat(),'recommendation_baseline_digest':baseline_digest(fixture.sport),
+            'recommended_quote_source_at':aware(chosen[0].source_at).isoformat() if chosen else None}
         fixture.state = recommendation_state(gates, has_execution=bool(complete), personnel=personnel, edge=edge, frozen=True)
         fixture.suggested_stake = suggested if fixture.state == State.RECOMMEND else 0
         fixture.dirty = False

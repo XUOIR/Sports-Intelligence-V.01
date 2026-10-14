@@ -5,7 +5,7 @@ from app.clock import now
 from app.models import Fixture,Evidence,Snapshot,MarketOdds,ModelValidation,JobLease,State
 from app.engine import freeze,evaluate
 from app.ingestion import quote_identity
-from app.model_config import MODEL_VERSION
+from app.model_config import MODEL_VERSION,baseline_digest
 
 async def test_exact_anchor_freezes_only_pre_cutoff_evidence(database,monkeypatch):
     anchor=now();start=anchor+timedelta(minutes=30)
@@ -47,7 +47,9 @@ async def seed_recommendation(database):
         session.add(Snapshot(fixture_id='nhl:recommend',anchor_at=anchor,collected_at=anchor+timedelta(seconds=1),game_date=start.date(),
             vector=[.5,.5,0,10,10,.5,.5,0,5,5,1,1,0,0,0],evidence_ids=[],model_version=MODEL_VERSION,baseline_home_probability=Decimal('.7')))
         session.add(ModelValidation(version='approved',sport='NHL',parameters={'slope':1,'intercept':0},approved=True,
-            created_at=current-timedelta(days=1),report={'baseline_version':MODEL_VERSION,'test_through':(current-timedelta(days=10)).isoformat()}))
+            created_at=current-timedelta(days=1),report={'baseline_version':MODEL_VERSION,'baseline_digest':baseline_digest('NHL'),
+                'passing':True,'train_records':300,'calibration_records':100,'test_records':100,'test_brier':'.19','reference_brier':'.25',
+                'test_through':(current-timedelta(days=10)).isoformat()}))
         for selection in ('Home','Away'):
             session.add(MarketOdds(fixture_id='nhl:recommend',bookmaker='playnow',market='h2h',selection=selection,line=None,
                 decimal_odds=2,implied_probability=Decimal('.5'),source_at=current,identity=quote_identity('playnow','h2h',selection,None)))

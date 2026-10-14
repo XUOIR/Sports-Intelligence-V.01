@@ -51,3 +51,18 @@ def test_probable_goalie_is_never_treated_as_confirmed():
     assert not any(goalie_confirmation({}).values())
     with pytest.raises(ProviderError):array({'gameWeek':None},'gameWeek')
     with pytest.raises(ProviderError):array([None])
+
+async def test_montreal_accent_matches_official_fixture_without_duplicate_or_lost_prices(database,monkeypatch):
+    start=now()+timedelta(hours=2)
+    async with database.begin() as session:
+        session.add(Fixture(id='nhl:accent',sport='NHL',home='Montréal Canadiens',away='Toronto Maple Leafs',commence_time=start))
+    async def quotes(sport):
+        return [{'id':'external','commence_time':start.isoformat(),'home_team':'Montreal Canadiens','away_team':'Toronto Maple Leafs',
+            'bookmakers':[{'key':'playnow_ca','last_update':now().isoformat(),'markets':[{'key':'h2h','outcomes':[
+                {'name':'Montreal Canadiens','price':2},{'name':'Toronto Maple Leafs','price':1.9}]}]}]}]
+    monkeypatch.setattr('app.providers.odds',quotes)
+    await ingest_odds()
+    async with database() as session:
+        assert len((await session.scalars(select(Fixture))).all())==1
+        assert (await session.get(Fixture,'nhl:accent')).metrics['execution_source_present']
+        assert {q.selection for q in (await session.scalars(select(MarketOdds))).all()}=={'Montréal Canadiens','Toronto Maple Leafs'}

@@ -9,6 +9,7 @@ from app.clock import now
 from app.models import Fixture,PersonalBet,EvaluationCycle,RuntimeLimit,State
 from app.limits import Limits,BudgetExceeded
 from app.ingestion import quote_identity
+from app.config import settings
 
 HEADERS={"Authorization":"Bearer test-session-token-32-characters-long"}
 
@@ -65,8 +66,8 @@ async def test_durable_limits_and_fixture_cycle_cap(database):
         session.add(EvaluationCycle(id='cycle',fixture_id='nhl:1'))
     for _ in range(3): await guard.llm_attempt('cycle')
     with pytest.raises(BudgetExceeded):await guard.llm_attempt('cycle')
-    await guard.reserve('openrouter',12)
-    with pytest.raises(BudgetExceeded):await guard.reserve('openrouter')
+    await guard.reserve('nhl',settings.nhl_daily_requests)
+    with pytest.raises(BudgetExceeded):await guard.reserve('nhl')
     assert await guard.lease('worker',60)
     assert not await guard.lease('worker',60)
     await guard.trip('openrouter')

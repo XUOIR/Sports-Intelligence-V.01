@@ -1,6 +1,6 @@
 # Sports Intelligence V0.1
 
-FastAPI + Supabase PostgreSQL + Next.js. Prepared for Render; **not deployed**. Initial bankroll: **CAD 1,100.00**. Unit value: CAD 100.00. Quarter Kelly is capped at 1.5% of current bankroll (initial cap CAD 16.50). The application records manual tickets; it does not place wagers.
+FastAPI + Supabase PostgreSQL + Next.js, deployed to Render from `XUOIR/Sports-Intelligence-V.01`. Initial bankroll: **CAD 1,100.00**. Unit value: CAD 100.00. Quarter Kelly is capped at 1.5% of current bankroll (initial cap CAD 16.50). The application records manual tickets; it does not place wagers.
 
 ## What is implemented
 
@@ -12,7 +12,7 @@ FastAPI + Supabase PostgreSQL + Next.js. Prepared for Render; **not deployed**. 
 
 ## Data sources and deliberate locks
 
-The Odds API supplies prices. NHL information comes exclusively from `https://api-web.nhle.com/v1/`: schedule, standings, team season schedules, game-center details, and final scores. PandaScore supplies esports fixtures, tournament rosters, available map structures, and recent match results. OpenRouter is a final adversarial review after deterministic gates pass.
+The Odds API supplies prices. NHL schedule, standings, team season schedules, game-center details, and final scores come from `https://api-web.nhle.com/v1/`. Advanced factors and confirmed starters require source-backed operator evidence until a suitable feed is verified. The active phase is NHL; CS2 follows, then MLB. PandaScore ingestion is disabled pending the required betting-use license and field contracts. OpenRouter is a final adversarial review after deterministic gates pass, and paid AI remains disabled until both USD budgets and a matching provider-side monthly key limit are set.
 
 The Odds API documents PlayNow as **`playnow_ca`**. The adapter explicitly normalizes it to `playnow`; `bclc` also qualifies. No other bookmaker qualifies as the execution source. A missing, withdrawn, anomalous, future-dated, or stale quote closes the price gate immediately. Pinnacle movement compares the same market, selection, and exact numerical line. A 1.00 percentage point change requests re-evaluation against the PlayNow quotes in that batch, without recursively requesting more odds.
 
@@ -28,7 +28,7 @@ The Odds API documents PlayNow as **`playnow_ca`**. The adapter explicitly norma
 
 ## Security and existing environment
 
-Your existing root `.env` was preserved. No secrets are included in source, builds, screenshots, or the distributable archive. `.env.example` lists required names. The four integration keys were detected as configured without printing their values. `ADMIN_API_TOKEN` was missing at preparation time.
+Secrets are managed in Render. No secrets are included in source, client builds, or committed reports. `.env.example` lists required names. Do not copy live credentials into local QA environments.
 
 Set a random server-only `ADMIN_API_TOKEN` of at least 32 characters and a `DASHBOARD_PASSWORD` of at least 12 characters. The Render blueprint generates these and shares only the internal API token between services. The dashboard uses signed, expiring, HttpOnly, SameSite=Strict cookies, checks mutation origins, limits login attempts, and proxies API requests on the server. No integration token uses `NEXT_PUBLIC_`.
 
@@ -55,9 +55,9 @@ Set-Location backend
 
 In a separate terminal, run `pnpm --dir frontend dev`. Local scheduling defaults to disabled. Enable `ENABLE_SCHEDULER=true` only in the single service that should ingest live feeds. Container deployment uses `compose.yaml`; it intentionally keeps scheduling off until enabled explicitly.
 
-## Render deployment (files only)
+## Render deployment
 
-1. Push the source to your own GitHub repository. No repository was created or uploaded during preparation.
+1. Commit and push changes to the active repository `XUOIR/Sports-Intelligence-V.01`.
 2. In Render, create a Blueprint from `render.yaml`. It declares two always-on `0.5c-512mb` services in Oregon, one instance each. API migrations execute before deploy; the scheduler runs inside the single FastAPI process. Automatic redeployment is disabled.
 3. Enter the four integration secrets in Render. Use Supabase's IPv4-compatible Session Pooler on port 5432, with the project-qualified username, rather than a direct IPv6 endpoint or the HTTPS Data API URL. Review your Supabase connection capacity for the requested maximum of 30 backend connections.
 4. Retrieve the generated dashboard password from Render's environment settings. The frontend reaches the backend through Render's internal host, and the API token stays on the servers.

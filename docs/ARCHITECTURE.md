@@ -29,7 +29,7 @@ The two services are independently deployable containers. The database is the du
 
 `source_evidence` records provider timestamps separately from observation timestamps. `frozen_snapshots` stores the 15-field vector, original bounded source payloads/provenance, frozen baseline factors, baseline and calibrated prediction, model version, outcome, and Brier error. `model_validation` stores sport-specific calibration parameters and holdout results.
 
-`runtime_limits` stores per-provider Pacific-day reservations and durable outage cooldowns. `evaluation_cycles` stores per-cycle attempt counts and bounded reusable assessment results. `job_leases` prevents duplicate job/evaluation dispatch during restarts or overlapping processes. `audit_log` stores wager actions, evidence verification, and archived snapshots when official start times change.
+`runtime_limits` stores per-provider Pacific-day/month reservations, USD reservations, fixture lifetime caps, the emergency pause, and outage latches. `provider_calls` stores durable paid request identities and conservative charges; `provider_state` caches non-secret quotas and account observations. `evaluation_cycles` stores per-cycle attempt counts and bounded reusable assessment results. `job_leases` prevents duplicate job/evaluation dispatch during restarts or overlapping processes. `audit_log` stores wager actions, provider pause/resume, evidence verification, and archived snapshots when official start times change.
 
 All application timestamps use timezone-aware `America/Vancouver`. PostgreSQL `timestamptz` stores instants; sessions and application output use Vancouver time. The pinned IANA `tzdata` wheel handles Vancouver's 2026 permanent Pacific time rule and older historical DST dates. The frontend formats the server's Vancouver wall-clock timestamp instead of trusting an outdated browser timezone database.
 
@@ -38,9 +38,9 @@ All application timestamps use timezone-aware `America/Vancouver`. PostgreSQL `t
 | Job | Frequency | Limit and recovery |
 |---|---|---|
 | NHL history and fatigue collection | Daily 04:00 Vancouver | One instance; bounded team count; no target-date games |
-| NHL schedule/standings + available personnel details | Hourly | Histories remain daily; at most six imminent game details per cycle |
-| PandaScore upcoming/recent matches and rosters | Every two hours | 50 records per endpoint; max six roster tournaments per sport |
-| Sportsbook prices | Every two hours | NHL/NBA/MLB/NFL; 48-hour horizon; three exact market types |
+| NHL schedule/standings + available personnel details | Hourly, plus pre-anchor preparation | Histories cached four hours with original timestamps; at most six imminent game details per cycle |
+| PandaScore upcoming/recent matches and rosters | Disabled in NHL phase | Later requires appropriate license, verified contracts, and explicit activation |
+| Sportsbook prices | Local wake every five minutes; paid batch at most once per two-hour period | NHL only; 48-hour horizon; skip absent official fixtures; three exact market types |
 | Frozen snapshot | Official start minus 30 minutes | Date trigger; all source observations must precede cutoff; max five seconds processing delay |
 | Gate refresh | Every minute | Database only; max 60 imminent fixtures; no background paid loop |
 | NHL/esports final outcomes | Every four hours | Bounded unresolved fixtures; final scores never settle tickets automatically |
@@ -54,22 +54,25 @@ Scheduler jobs coalesce missed interval triggers and allow one concurrent run ea
 | Boundary | Default |
 |---|---:|
 | Odds credits per Pacific day | 120 |
-| PandaScore HTTP attempts per day | 120 |
+| Odds credits per Pacific month | 500 |
+| PandaScore HTTP attempts per day | 0 |
 | OpenRouter HTTP attempts per day | 12 |
-| NHL HTTP attempts per day | 100 |
-| Attempts per HTTP cycle | 3, only for short 429 cooldowns |
-| LLM attempts per fixture evaluation cycle | 3, persisted before transmission |
-| OpenRouter total deadline | 15 seconds, including retries/body reading |
+| OpenRouter USD per day / month | 0 / 0 (paid AI disabled) |
+| OpenRouter USD reservation per review | 0.01 |
+| NHL HTTP attempts per day | 300 |
+| Attempts per HTTP cycle | Paid: 1; free: up to 3 for bounded redirects or short 429 cooldowns |
+| LLM attempts per fixture lifetime and evaluation cycle | 3, persisted before transmission |
+| OpenRouter total deadline | 15 seconds, including key preflight and body reading |
 | Other providers' total cycle deadline | 45 seconds |
 | Provider response | 1,000,000 bytes by default, streamed with bounded chunks |
 | Backend/proxy mutation body | 16,384 bytes |
 | Dashboard login body | 1,024 bytes |
 | LLM serialized statistics summary | 3,500 bytes |
 | LLM completion | 600 tokens |
-| Normal circuit cooldown | 15 minutes |
-| Invalid provider authentication cooldown | 24 hours |
+| Free provider circuit cooldown | 15 minutes |
+| Paid provider failure recovery | Explicit operator resume; identities and budgets remain consumed |
 
-Budget reservations commit before a network attempt and are not refunded after errors or crashes. Odds attempts reserve three credits for three markets and fewer than ten explicitly selected bookmakers. Every retry consumes a reservation. Provider quota exhaustion opens a cooldown. Retry-After values over four seconds stop this request cycle and open a cooldown instead of polling rapidly. 500/503 and network/timeout failures trip the circuit and do not retry the same paid POST. Other application/account activity is outside these per-application budgets; provider account spending limits remain necessary for an account-wide currency cap.
+Budget reservations commit before a network attempt and are not refunded after errors or crashes. Odds attempts reserve three credits for three markets and fewer than ten explicitly selected bookmakers. Paid requests never retry automatically, including GETs and 429s. Free retries consume request reservations. Provider quota exhaustion closes paid ingestion. Free Retry-After values over four seconds stop the request cycle and open a cooldown. Other application/account activity is outside these per-application budgets; provider account spending limits remain necessary for an account-wide currency cap. See [API budgets](API_BUDGETS.md) for verified prices, usage estimates, source limitations, and account checks.
 
 ## Probability, market, and personnel contracts
 
