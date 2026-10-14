@@ -30,7 +30,7 @@ The source contract covers the 2026–27 season and requires an update before Ju
 
 ## Verification
 
-**35 offline/staging tests passed**, covering weighted aggregation, sample/day exclusion, duplicates, GSAx sign, schema changes, cache integrity, byte limits, gzip expansion/truncation, failed admission, atomic replacement and idempotency. Backend checks cover source ingestion, monthly rollback, successes/failures, absence of paid calls, authenticated refresh, repeated requests, stale cache reads and pre-anchor retention. Existing API/model/staking/spending regressions passed; frontend tests, type checks and the production build passed.
+**35 offline/staging tests passed**, covering weighted aggregation, sample/day exclusion, duplicates, GSAx sign, schema changes, cache integrity, byte limits, gzip expansion/truncation, failed admission, atomic replacement and idempotency. Backend checks cover source ingestion, monthly rollback, successes/failures, absence of paid calls, authenticated refresh, repeated requests, stale cache reads and pre-anchor retention. All **152 backend tests**, **35 offline/staging tests** and **9 frontend tests** passed (196 total). Type checks and the production frontend build passed. The updated two-service Blueprint also passed Render's current public JSON Schema; automatic deploy remains explicitly "off".
 
 Browser QA used real audited statistics in disposable local SQLite, with an explicitly illustrative Toronto/Edmonton matchup. It verified private login, unconfirmed goalies, insufficient samples, Settings isolation, the current theme and a 390-pixel mobile layout without horizontal page overflow. Live keys and real wagers were excluded; temporary servers were stopped.
 

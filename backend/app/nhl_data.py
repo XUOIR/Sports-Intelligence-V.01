@@ -233,4 +233,3 @@ def nhl_checks(payload, rows):
     return {"verification_date": payload["currentDate"], "completed_games": len(completed),
             "game_ids": completed, "failures": failures,
             "scope": "One completed day only; not full-season completeness proof"}
-
