@@ -30,6 +30,13 @@ def test_official_score_contract_zero_scores_and_schedule():
     assert matches.interval(games,now().date())==30
     assert matches.parse_scores(payload('FUT'),now().date())[0]['home_score'] is None
 
+def test_pregame_period_zero_and_missing_clock_do_not_discard_valid_scores():
+    p=payload('PRE');p['games'][0]['periodDescriptor']['number']=0
+    assert matches.parse_scores(p,now().date())[0]['period'] is None
+    p=payload();p['games'][0]['clock']='unavailable';p['games'][0]['periodDescriptor']=None
+    game=matches.parse_scores(p,now().date())[0]
+    assert game['home_score']==3 and game['clock'] is None and game['period'] is None
+
 @pytest.mark.parametrize('change',[lambda p:p.update(currentDate='2020-01-01'),lambda p:p['games'].append(p['games'][0]),
     lambda p:p['games'][0].update(gameState='mystery'),lambda p:p['games'][0]['homeTeam'].update(score=True),
     lambda p:p['games'][0]['homeTeam'].pop('score')])

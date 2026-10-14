@@ -53,10 +53,14 @@ def parse_scores(payload,day):
             if state in LIVE|FINAL and any(v is None for v in scores.values()):raise ValueError()
             schedule=game.get('gameScheduleState','OK')
             if schedule not in {'OK','PPD','SUSP','CNCL','TBD'}:raise ValueError()
-            period=game.get('periodDescriptor') or {};clock=game.get('clock') or {}
+            period=game.get('periodDescriptor');clock=game.get('clock')
+            period=period if isinstance(period,dict) else {}
+            clock=clock if isinstance(clock,dict) else {}
             number=period.get('number');remaining=clock.get('timeRemaining')
-            if number is not None and (type(number) is not int or not 1<=number<=20):raise ValueError()
-            if remaining is not None and (not isinstance(remaining,str) or not re.fullmatch(r'\d{2}:\d{2}',remaining)):raise ValueError()
+            # Pregame periods can be zero; optional clock metadata must not
+            # discard otherwise valid league scores. Unknown fields stay null.
+            if type(number) is not int or not 1<=number<=20:number=None
+            if not isinstance(remaining,str) or not re.fullmatch(r'\d{2}:\d{2}',remaining):remaining=None
             result.append({'id':f'nhl:{gid}','sport':'NHL','commence_time':start.isoformat(),
                 'game_state':state,'schedule_state':schedule,
                 **{side:text(team.get('name') or team.get('commonName')) for side,team in teams.items()},
@@ -103,10 +107,10 @@ async def refresh_day(day):
         seconds=interval(games,day)
         await limits.observe(f'nhl-score:{day}',{'games':games,'interval_seconds':seconds,
             'next_at':(started+timedelta(seconds=seconds)).isoformat(),'error':None})
-    except (ProviderError,BudgetExceeded):
+    except (ProviderError,BudgetExceeded) as exc:
         # Failed fetches keep the original successful observation timestamp.
         # Store the failure separately, including when no good payload exists.
-        await limits.observe(f'nhl-error:{day}',{'at':now().isoformat()})
+        await limits.observe(f'nhl-error:{day}',{'at':now().isoformat(),'category':type(exc).__name__,'reason':str(exc)[:200]})
         if not await limits.blocked('nhl_scores'):await limits.trip('nhl_scores')
 
 async def tick():
