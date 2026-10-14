@@ -4,6 +4,8 @@ Reviewed October 13, 2026 for XUOIR/Sports-Intelligence-V.01. This is a research
 
 ## Purchase recommendation
 
+The owner subsequently clarified the current private statistics-tool use. The [expanded low-cost source review](NHL_LOW_COST_DATA_OPTIONS.md) takes precedence for immediate procurement: test permitted free downloads and public NHL datasets first. The paid providers below remain optional candidates, not prerequisites for a useful NHL statistics release.
+
 Keep the official NHL feed for scores, schedules and basic statistics. Prioritize the missing advanced inputs and confirmed starters. Extra odds capacity is useful after those inputs work, but does not make the model valid by itself.
 
 First establish whether MoneyPuck's published downloads can cover the current private use. Its policy permits noncommercial use with credit; other uses require inquiry, and scraping outside published downloads requires approval. A future public subscription product needs appropriate rights. No commercial price is published on the reviewed page. [MoneyPuck downloads and use policy](https://moneypuck.com/data.htm).

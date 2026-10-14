@@ -50,6 +50,8 @@ The strongest new finding from the supplied handoff is PropLine's **specific Pla
 
 The [paid NHL source comparison](NHL_PAID_DATA_OPTIONS.md) ranks advanced-stat, confirmed-starter and optional odds candidates by documented fit and published cost. It identifies Evolving Hockey Pro for low-cost research, SportsDataIO commercial NHL for explicit starter confirmation, and MoneyPuck as a permitted-download alternative. No subscription or additional spending is activated by that research.
 
+The owner's subsequent private statistics-tool clarification is reflected in the [expanded low-cost review](NHL_LOW_COST_DATA_OPTIONS.md): prioritize permitted free data, source-backed manual starter confirmation and real advanced matchup statistics. A current SportsDataverse sample was checked for shot xG, goalie IDs and exact 5v5 fields. A useful statistics release does not require a paid commercial feed; approved model predictions remain subject to the existing validation gates.
+
 The production audit found **zero approved models and zero labeled, usable training records**. No UI or AI review can cure that. The current strict model requires normalized goalie/GSAx, 5v5 xG, rest/fatigue and venue/special-team inputs, source-backed confirmed starters, a T−30 snapshot, current PlayNow prices and all eight gates.
 
 1. **Data contract:** obtain permitted advanced NHL data plus confirmed-starting-goalie evidence. Preserve game/player IDs, original observation timestamps, sample windows, normalization definitions and raw source references. Reject probable starters, incomplete factors and postgame leakage.
