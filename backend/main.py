@@ -37,6 +37,7 @@ from app.allowances import provider_allowances
 from app import manual_odds
 from app import matches
 from app import nhl_advanced
+from app import verification
 from app.http import ProviderError
 
 @asynccontextmanager
@@ -239,8 +240,9 @@ async def fixture_detail(fixture_id: str, session=Depends(database)):
         raise HTTPException(404,"Fixture not found")
     quotes = (await session.scalars(select(MarketOdds).where(MarketOdds.fixture_id == fixture_id).order_by(MarketOdds.source_at.desc()).limit(100))).all()
     snapshot = await session.get(Snapshot,fixture_id)
+    statistics = await nhl_advanced.detail(session,fixture)
     return {"fixture":safe_fixture(fixture), "odds":[serialize(q) for q in quotes], "snapshot":serialize(snapshot) if snapshot else None,
-            "nhl_statistics":await nhl_advanced.detail(session,fixture)}
+            "nhl_statistics":statistics, "verification":await verification.detail(session,fixture,snapshot,quotes,statistics)}
 
 class WagerInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -331,7 +333,7 @@ class EvidenceInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
     source_at: datetime
     source_reference: str = Field(min_length=10,max_length=300)
-    factors: dict[str, Decimal]
+    factors: dict[str, Decimal] | None = None
     personnel_confirmed: StrictBool
     other_markets_verified: StrictBool
     opposing_case_verified: StrictBool
@@ -368,18 +370,20 @@ async def verified_evidence(fixture_id: str, body: EvidenceInput, session=Depend
             raise HTTPException(409,'Evidence is accepted only for an upcoming active-sport fixture')
         if fixture.sport=='NHL' and body.personnel_confirmed and (not body.home_goalie or not body.away_goalie):
             raise HTTPException(422,'Record both starting-goalie names with the confirmation source')
-        try:
-            baseline(fixture.sport,body.factors)
-        except ValueError as exc:
-            raise HTTPException(422,str(exc)) from None
+        if body.factors is not None or fixture.sport!='NHL':
+            try:
+                baseline(fixture.sport,body.factors or {})
+            except ValueError as exc:
+                raise HTTPException(422,str(exc)) from None
         roster_ok = complete_roster(body.home_players) and complete_roster(body.away_players)
         if fixture.sport != "NHL" and not roster_ok:
             body.personnel_confirmed = False
         # New factors may be collected before the anchor only. Frozen probability never changes later.
-        if now()>=aware(fixture.commence_time)-timedelta(minutes=30) and {k:float(v) for k,v in body.factors.items()}!=fixture.metrics.get('factors',{}):
+        if body.factors is not None and now()>=aware(fixture.commence_time)-timedelta(minutes=30) and {k:float(v) for k,v in body.factors.items()}!=fixture.metrics.get('factors',{}):
             raise HTTPException(409,'The factor inputs are frozen at T−30; changed or missing factors cannot be backfilled')
-        factors = fixture.metrics.get("factors",{}) if now() >= aware(fixture.commence_time)-timedelta(minutes=30) else {k:float(v) for k,v in body.factors.items()}
-        if now() < aware(fixture.commence_time)-timedelta(minutes=30):
+        factors = fixture.metrics.get("factors",{})
+        if body.factors is not None and now() < aware(fixture.commence_time)-timedelta(minutes=30):
+            factors = {k:float(v) for k,v in body.factors.items()}
             session.add(Evidence(fixture_id=fixture_id,kind="model_factors",source_at=source,observed_at=now(),payload=factors))
         fixture.metrics = {**fixture.metrics, "factors":factors,"personnel_confirmed":body.personnel_confirmed,
             "confirmed_at":source.isoformat(), "roster_complete":roster_ok,

@@ -10,6 +10,7 @@ from .models import Fixture, Evidence, MarketOdds, State, Snapshot, AuditLog
 from .maths import implied, parse_odds, decimal
 from .model_config import SHARP_MOVEMENT
 from .features import eligible_history
+from .nhl_history import completed_games, HISTORY_CONTRACT
 from .config import settings
 from .limits import limits
 
@@ -110,7 +111,8 @@ async def ingest_nhl(history=False):
                     await session.flush()
                 elif aware(fixture.commence_time) != start:
                     await reschedule(session,fixture,start)
-                fixture.metrics = {**fixture.metrics, 'home_abbrev': home['abbrev'], 'away_abbrev': away['abbrev']}
+                fixture.metrics = {**fixture.metrics, 'home_abbrev': home['abbrev'], 'away_abbrev': away['abbrev'],
+                                   'nhl_season': game.get('season'), 'nhl_game_type': game.get('gameType')}
                 evidence(session, fixture, "schedule", {"start": start.isoformat(), "provider_id": str(game["id"])})
                 h, a = by_abbrev.get(home["abbrev"]), by_abbrev.get(away["abbrev"])
                 if h and a:
@@ -119,26 +121,12 @@ async def ingest_nhl(history=False):
                 else:
                     log.warning("NHL standings missing for fixture %s", fid)
                 if history:
-                    payload = {}
+                    payload = {'contract': HISTORY_CONTRACT}
                     for side, team in (("home", home), ("away", away)):
                         abbr = team["abbrev"]
                         if abbr not in histories:
                             raise ValueError("Bounded history fetch missing")
-                        finished = []
-                        for row in histories[abbr]:
-                            if row.get("gameState") not in {"OFF", "FINAL"}:
-                                continue
-                            if "score" not in row["homeTeam"] or "score" not in row["awayTeam"]:
-                                continue
-                            started = aware(row["startTimeUTC"])
-                            # Feed lacks end timestamps. Conservative next-day boundary avoids same-day leakage.
-                            ended = (started+timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
-                            if ended <= started:
-                                ended = started+timedelta(hours=6)
-                            is_home = row["homeTeam"]["abbrev"] == abbr
-                            won = row["homeTeam"]["score"] > row["awayTeam"]["score"]
-                            finished.append({"started_at": started.isoformat(), "ended_at": ended.isoformat(), "win": won if is_home else not won})
-                        payload[side] = eligible_history(finished, start)[:10]
+                        payload[side] = completed_games(histories[abbr], abbr, game['season'], history_times[abbr], start)
                     evidence(session, fixture, "history", payload,at=min(history_times[home['abbrev']],history_times[away['abbrev']]))
                 fixture.updated_at = now()
             except (KeyError, ValueError, TypeError) as exc:

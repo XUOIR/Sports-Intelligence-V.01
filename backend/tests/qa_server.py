@@ -15,7 +15,7 @@ from uuid import uuid4
 from sqlalchemy.ext.asyncio import create_async_engine,async_sessionmaker
 from app.api import app
 from app import db
-from app.models import Base,Account,Fixture,State,PersonalBet,Outcome,ProviderState,MarketOdds,Snapshot
+from app.models import Base,Account,Fixture,State,PersonalBet,Outcome,ProviderState,MarketOdds,Snapshot,Evidence
 from app.model_config import GATE_NAMES
 from app.clock import now
 
@@ -70,6 +70,14 @@ async def lifespan(application):
                 from app.ingestion import quote_identity
                 await session.flush()
                 fixture=await session.get(Fixture,'qa:nhl-stats')
+                from app.nhl_history import HISTORY_CONTRACT
+                observed=now()-timedelta(minutes=1)
+                history=[{'contract':HISTORY_CONTRACT,'game_id':str(2026020000+i),'game_type':2,'season':20262027,
+                          'started_at':(now()-timedelta(days=i)).isoformat(),'completion_observed_at':observed.isoformat(),'win':i%2==0} for i in range(1,7)]
+                for kind,payload in [('schedule',{'start':fixture.commence_time.isoformat()}),
+                                     ('standings',{'home':{'games':6,'points_pct':.5},'away':{'games':6,'points_pct':.6}}),
+                                     ('history',{'contract':HISTORY_CONTRACT,'home':history,'away':history})]:
+                    session.add(Evidence(fixture_id=fixture.id,kind=kind,source_at=observed,observed_at=observed,payload=payload))
                 fixture.selection=fixture.home;fixture.probability='.62';fixture.edge='.12'
                 for selection,price in [(fixture.home,'2.0'),(fixture.away,'1.8')]:
                     session.add(MarketOdds(fixture_id=fixture.id,bookmaker='playnow',market='h2h',selection=selection,line=None,

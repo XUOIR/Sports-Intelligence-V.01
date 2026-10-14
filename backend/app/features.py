@@ -2,6 +2,7 @@ import calendar
 from datetime import datetime, timedelta
 from .clock import aware
 from .maths import decimal
+from .nhl_history import HISTORY_CONTRACT
 
 FEATURE_NAMES = ("home_points_pct", "away_points_pct", "points_pct_diff", "home_season_games", "away_season_games",
     "home_recent_win_rate", "away_recent_win_rate", "recent_win_rate_diff", "home_recent_sample", "away_recent_sample",
@@ -29,8 +30,18 @@ def eligible_history(games: list[dict], start: datetime, esports=False) -> list[
     cutoff = three_month_cutoff(start) if esports else None
     accepted = []
     for game in games:
-        ended = aware(game["ended_at"])
         began = aware(game["started_at"])
+        if game.get('contract') == HISTORY_CONTRACT:
+            observed = aware(game['completion_observed_at'])
+            if game.get('game_type') != 2 or type(game.get('season')) is not int or began >= observed:
+                raise ValueError('Invalid completed NHL history')
+            if began.date() >= start.date() or observed > start - timedelta(minutes=30):
+                continue
+            if type(game.get('win')) is not bool:
+                raise ValueError('History outcome must be explicit')
+            accepted.append(game)
+            continue
+        ended = aware(game["ended_at"])
         if ended < began:
             raise ValueError("Overlapping/invalid history interval")
         if ended.date() >= start.date() or ended >= start - timedelta(minutes=30):
@@ -40,9 +51,12 @@ def eligible_history(games: list[dict], start: datetime, esports=False) -> list[
         if type(game.get("win")) is not bool:
             raise ValueError("History outcome must be explicit")
         accepted.append(game)
-    accepted.sort(key=lambda g: aware(g["ended_at"]), reverse=True)
+    accepted.sort(key=lambda g: aware(g["started_at"]), reverse=True)
     for previous, following in zip(accepted, accepted[1:]):
-        if aware(following["ended_at"]) > aware(previous["started_at"]):
+        if following.get('contract') == HISTORY_CONTRACT:
+            if aware(following['started_at']) == aware(previous['started_at']):
+                raise ValueError('Duplicate NHL starts rejected')
+        elif aware(following["ended_at"]) > aware(previous["started_at"]):
             raise ValueError("Overlapping history games rejected")
     return accepted
 

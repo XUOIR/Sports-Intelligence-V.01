@@ -18,6 +18,9 @@ GATE_NAMES = ("price", "personnel", "form", "maps_veto", "other_markets", "oppos
 
 def baseline_digest(sport):
     from .features import FEATURE_NAMES
+    from .nhl_history import HISTORY_CONTRACT
     weights=NHL_WEIGHTS if sport=='NHL' else CS2_WEIGHTS if sport=='CS2' else {}
-    return hashlib.sha256(json.dumps({'version':MODEL_VERSION,'weights':weights,
-        'logit_scale':BASELINE_LOGIT_SCALE,'features':FEATURE_NAMES,'anchor_seconds':1800},sort_keys=True).encode()).hexdigest()
+    contract={'version':MODEL_VERSION,'weights':weights,
+        'logit_scale':BASELINE_LOGIT_SCALE,'features':FEATURE_NAMES,'anchor_seconds':1800}
+    if sport=='NHL':contract['history_contract']=HISTORY_CONTRACT
+    return hashlib.sha256(json.dumps(contract,sort_keys=True).encode()).hexdigest()

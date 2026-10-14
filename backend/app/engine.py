@@ -16,6 +16,7 @@ from .limits import limits, BudgetExceeded
 from .config import settings
 from .readiness import validated_model
 from .nhl_advanced import frozen_context
+from .nhl_history import HISTORY_CONTRACT
 
 async def freeze(fixture_id: str):
     async with db.Session.begin() as session:
@@ -43,6 +44,9 @@ async def freeze(fixture_id: str):
         try:
             if aware(selected["schedule"].payload["start"]) != aware(fixture.commence_time):
                 raise ValueError("Schedule evidence disagrees with official start")
+            if fixture.sport=='NHL' and fixture.metrics.get('nhl_season') and selected['history'].payload.get('contract')!=HISTORY_CONTRACT:
+                fixture.state, fixture.reason = State.HOLD, 'Regular-season NHL history requires a verified refresh'
+                return
             vector = frozen_vector(selected["standings"].payload["home"], selected["standings"].payload["away"],
                 selected["history"].payload, fixture.commence_time)
             factor_source = await session.scalar(select(Evidence).where(Evidence.fixture_id == fixture_id,

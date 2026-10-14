@@ -12,6 +12,7 @@ from .maths import calibrated, decimal
 from .maths import baseline
 from .features import validate_source,frozen_vector
 from .validation import chronological_split, fit_platt, brier
+from .nhl_history import HISTORY_CONTRACT
 
 def validate(records):
     ids = set()
@@ -31,6 +32,8 @@ def validate(records):
             source=r['sources'][kind]
             validate_source(kind,source['source_at'],source['observed_at'],r['anchor_at'])
         standings=r['sources']['standings']['payload']
+        if r['sport']=='NHL' and r['sources']['history']['payload'].get('contract')!=HISTORY_CONTRACT:
+            raise ValueError('Legacy NHL history cannot validate the current regular-season model')
         recomputed=frozen_vector(standings['home'],standings['away'],r['sources']['history']['payload'],r['commence_time'])
         if recomputed!=r['vector'] or baseline(r['sport'],r['factors'])!=decimal(r['probability']):
             raise ValueError('Frozen vector/probability does not match its source evidence')
