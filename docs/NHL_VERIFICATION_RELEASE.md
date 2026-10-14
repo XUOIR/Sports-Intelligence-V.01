@@ -38,4 +38,13 @@ At 2:30 PM Pacific, Render's public status API still reported **Builds, deploys,
 
 Metered feeds remain deliberately paused through the existing operator control. A free provider metadata check at 2:30 PM confirmed 494/500 Odds API credits remaining (6 used), US$0 OpenRouter usage, and the US$3 key cap with monthly reset. The wallet remains US$10 with US$0 usage. The two earlier three-credit requests were already accounted for; no additional metered refresh or AI generation was sent during this continuation.
 
-After the platform recovers, verify the queued releases' actual commits and logs. Deploy the new verification/history commit once the earlier rollouts finish, and verify source inputs and private pages. Resume metered feeds only after confirming the repaired odds matcher is live; admit one guarded three-credit manual refresh and inspect its saved counts and actual PlayNow prices. Preserve any failed/uncertain admission and diagnose it without repeated paid requests. Confirmed starters and a compatible validated model remain required before any verified pick.
+### Combined rollout — 2:44 PM Pacific
+
+The older deployments were canceled after Render reported their Docker image builds complete but before they became live. Their replacements both explicitly target the tested code commit `df65017b6b61e9b08030c301b2c5981d6d8bdf24`, including the market pages, odds-matching repair and verification/history fixes:
+
+- Backend: `dep-db7vbm67bikc73ar1bk0`, submitted 2:36:24 PM Pacific.
+- Frontend: `dep-db7veh2jnfac73d2aii0`, submitted 2:42:28 PM Pacific.
+
+Both replacements still showed Building / Awaiting logs at 2:44 PM. This is submission evidence, not successful deployment. Render's public incident API reported monitoring at 2:44 PM, updated at 2:43 PM; recovery does not establish that our releases are live. No environment secret, service plan, spend cap or credit reservation was reset. Temporary QA servers were stopped and the local preview tab was closed; private local pages had returned login redirects and the detail proxy returned 401 without a session.
+
+To complete rollout, verify these combined releases' actual commits, migration/startup logs, source inputs, health and private pages. Resume metered feeds only after confirming the repaired odds matcher is live; admit one guarded three-credit manual refresh and inspect its saved counts and actual PlayNow prices. Preserve any failed/uncertain admission and diagnose it without repeated paid requests. Confirmed starters and a compatible validated model remain required before any verified pick.
