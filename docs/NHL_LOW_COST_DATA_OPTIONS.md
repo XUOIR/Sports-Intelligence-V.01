@@ -4,7 +4,7 @@ Reviewed October 13, 2026. Active project: XUOIR/Sports-Intelligence-V.01. The o
 
 ## Recommended order
 
-The [complete NHL provider preflight](NHL_PROVIDER_PREFLIGHT.md) consolidates billing units, quotas/resets, freshness, rights, required fields and trial eligibility for the full shortlist. Its current decision is MoneyPuck plus the existing NHL feed and manual starter confirmation; the strongest premium advanced-data candidate is Sportlogiq, subject to a written offer and exact-field verification.
+The [complete NHL provider preflight](NHL_PROVIDER_PREFLIGHT.md) consolidates billing units, quotas/resets, freshness, rights, required fields and trial eligibility for the full shortlist. Its current decision is MoneyPuck plus the existing NHL feed and manual starter confirmation, with no additional data subscription. The owner excluded Sportlogiq from the active shortlist because its unpriced enterprise offering is not a realistic release option. Other quote-only enterprise products remain background research.
 
 Start with the existing NHL feed, permitted MoneyPuck downloads, and a bounded offline evaluation of SportsDataverse game data. Keep source-backed starter confirmation manual initially. Use PuckIQ only if its extra context improves the tool. Spend on a small subscription only for a demonstrated gap.
 
