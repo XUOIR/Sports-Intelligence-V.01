@@ -11,8 +11,17 @@ The existing credentials were checked without paid odds or AI generation. Render
 | OpenRouter | Prepaid USD; tokens charged per model | `deepseek/deepseek-chat`: US$0.32/million input and US$0.89/million output tokens at catalogue verification | Current-key metadata exposes key caps and usage. Wallet metadata can require a management key; use the billing page when unavailable through the existing key. No new broad credential is required. |
 | Supabase | Database capacity, egress, storage, and monthly active users | Free: 500 MB database, 5 GB egress/month, 1 GB file storage, 50,000 monthly active users; unlimited API requests within resource constraints | Authenticated organization usage dashboard; there is no request-credit wallet. Database/file capacities do not reset monthly. |
 | NHL public API | Public requests | No monthly credit wallet or verified published service-level allowance | Application request ceilings are protective local limits, not an NHL entitlement. |
+| MoneyPuck published downloads | Dataset files; no published credit billing | Free eligible noncommercial use with attribution; no numeric download/request allowance verified | Samples required no account or API key. No credit wallet, paid quota or unlimited-access entitlement was established. |
 
 Sources: [Odds API plans](https://the-odds-api.com/), [Odds API quota costs](https://the-odds-api.com/liveapi/guides/v4/), [PandaScore limits](https://developers.pandascore.co/docs/rate-and-connections-limits), [OpenRouter current key](https://openrouter.ai/docs/api/api-reference/api-keys/get-current-api-key), [OpenRouter wallet](https://openrouter.ai/docs/api/api-reference/credits/get-credits), [OpenRouter live model catalogue](https://openrouter.ai/api/v1/models), [Supabase pricing](https://supabase.com/pricing).
+
+## Source checks before testing or integration
+
+The owner requires cost and access checks before spending time on source trials. For every new provider, document the billing unit, available allowance/reset, applicable use rights, required fields, update frequency and intended workload before data testing. Record unknowns explicitly. Reading public pricing/documentation is part of this check, not permission to begin a metered trial.
+
+An admitted trial must have a small fixed request/byte/row allowance, a time limit, failure accounting and an explicit stopping rule. No account upgrade, automatic top-up, paid fallback or production activation follows from a research test. Confirm chargeable endpoint costs and account caps before paid requests. Use existing local samples for additional checks when possible.
+
+MoneyPuck publishes free noncommercial datasets requiring credit; other uses and scraping outside listed downloads need inquiry/approval. Its current-season **shot dataset** is described as nightly; no exact refresh promise for every other file or numeric server quota was verified. [Published download policy](https://moneypuck.com/data.htm). Proposed use is one cached daily batch per selected dataset, with bounded single attempts and no same-cycle retry. That is our protective schedule, not a provider entitlement. Live scores stay on the existing NHL feed. MoneyPuck integration remains pending.
 
 ## Usage estimates and proposed budgets
 
