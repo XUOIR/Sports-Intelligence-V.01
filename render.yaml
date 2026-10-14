@@ -9,7 +9,7 @@ services:
     dockerContext: .
     healthCheckPath: /health/ready
     preDeployCommand: python -m alembic upgrade head
-    autoDeployTrigger: off
+    autoDeployTrigger: "off"
     envVars:
       - key: SUPABASE_DB_URL
         sync: false
@@ -45,6 +45,10 @@ services:
         value: "300"
       - key: NHL_SCORE_DAILY_REQUESTS
         value: "1500"
+      - key: ENABLE_NHL_ADVANCED_STATS
+        value: "true"
+      - key: NHL_ADVANCED_MONTHLY_BYTES
+        value: "1500000000"
       - key: TZ
         value: America/Vancouver
   - type: web
@@ -56,7 +60,7 @@ services:
     dockerfilePath: ./frontend/Dockerfile
     dockerContext: .
     healthCheckPath: /
-    autoDeployTrigger: off
+    autoDeployTrigger: "off"
     envVars:
       - key: BACKEND_HOST
         fromService:

@@ -81,6 +81,10 @@ def start():
     scheduler.add_job(scores_tick,'interval',seconds=30,next_run_time=now(),id='nhl-scores')
     scheduler.add_job(guarded, CronTrigger(hour=4, minute=0, timezone=PACIFIC), args=["nhl-daily",daily_nhl,1800], id="nhl-daily")
     scheduler.add_job(guarded, "interval", hours=1, args=["nhl-refresh",refresh_nhl], id="nhl-refresh")
+    if settings.nhl_advanced_enabled:
+        from .nhl_advanced import sync as advanced_sync
+        scheduler.add_job(guarded, CronTrigger(hour=9, minute=0, timezone=PACIFIC),
+                          args=['nhl-advanced-daily',advanced_sync,240], id='nhl-advanced-daily')
     if set(settings.active_sports)&{'CS2','VAL','LOL'} and settings.pandascore_daily_requests:
         scheduler.add_job(guarded, "interval", hours=2, args=["esports",ingest_esports,1800], id="esports")
     # Odds are requested only through the authenticated manual refresh endpoint.

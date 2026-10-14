@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from uuid import UUID
 from urllib.parse import parse_qs,urlsplit
-from fastapi import FastAPI, Depends, HTTPException, Header, Request
+from fastapi import FastAPI, Depends, HTTPException, Header, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse,RedirectResponse
 from pydantic import BaseModel, Field, ConfigDict, field_validator,StrictBool,HttpUrl
@@ -35,6 +35,7 @@ from app.limits import limits,BudgetExceeded
 from app.allowances import provider_allowances
 from app import manual_odds
 from app import matches
+from app import nhl_advanced
 from app.http import ProviderError
 
 @asynccontextmanager
@@ -146,6 +147,20 @@ async def dashboard(session=Depends(database)):
 async def operations(session=Depends(database)):
     return await operational_status(session)
 
+@app.post('/operations/nhl-statistics-refresh',dependencies=[Depends(authorize)],status_code=202)
+async def request_nhl_statistics(background_tasks:BackgroundTasks):
+    if not settings.nhl_advanced_enabled:
+        raise HTTPException(409,'NHL advanced statistics are not enabled')
+    if db.Session is None:
+        raise HTTPException(503,'Database is not configured')
+    try:
+        admission=await nhl_advanced.reserve_batch()
+    except BudgetExceeded as exc:
+        raise HTTPException(429,'The daily import or monthly transfer limit has been reached') from None
+    await limits.observe(nhl_advanced.STATUS_KEY,{'status':'queued','date':str(admission[1]),'queued_at':now().isoformat()})
+    background_tasks.add_task(nhl_advanced.sync,admission=admission)
+    return {'status':'queued','paid_credits':0,'daily_import_limit':1}
+
 @app.get('/matches',dependencies=[Depends(authorize)])
 async def match_feed(date:str|None=None,session=Depends(database)):
     try:day=matches.selected_date(date)
@@ -210,7 +225,8 @@ async def fixture_detail(fixture_id: str, session=Depends(database)):
         raise HTTPException(404,"Fixture not found")
     quotes = (await session.scalars(select(MarketOdds).where(MarketOdds.fixture_id == fixture_id).order_by(MarketOdds.source_at.desc()).limit(100))).all()
     snapshot = await session.get(Snapshot,fixture_id)
-    return {"fixture":safe_fixture(fixture), "odds":[serialize(q) for q in quotes], "snapshot":serialize(snapshot) if snapshot else None}
+    return {"fixture":safe_fixture(fixture), "odds":[serialize(q) for q in quotes], "snapshot":serialize(snapshot) if snapshot else None,
+            "nhl_statistics":await nhl_advanced.detail(session,fixture)}
 
 class WagerInput(BaseModel):
     model_config = ConfigDict(extra="forbid")

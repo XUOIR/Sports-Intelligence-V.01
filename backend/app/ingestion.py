@@ -110,6 +110,7 @@ async def ingest_nhl(history=False):
                     await session.flush()
                 elif aware(fixture.commence_time) != start:
                     await reschedule(session,fixture,start)
+                fixture.metrics = {**fixture.metrics, 'home_abbrev': home['abbrev'], 'away_abbrev': away['abbrev']}
                 evidence(session, fixture, "schedule", {"start": start.isoformat(), "provider_id": str(game["id"])})
                 h, a = by_abbrev.get(home["abbrev"]), by_abbrev.get(away["abbrev"])
                 if h and a:

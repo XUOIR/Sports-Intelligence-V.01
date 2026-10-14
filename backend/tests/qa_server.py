@@ -1,8 +1,13 @@
 """Disposable local browser QA. No live databases, providers, or scheduler."""
 import os
+import sys
+from pathlib import Path
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 for key in ("SUPABASE_DB_URL","THE_ODDS_API_KEY","ESPORTS_API_KEY","OPENROUTER_API_KEY"):
     os.environ[key] = ""
 os.environ["ENABLE_SCHEDULER"] = "false"
+if os.getenv('QA_NHL_STATISTICS')=='true':
+    os.environ['ENABLE_NHL_ADVANCED_STATS']='true'
 
 from contextlib import asynccontextmanager
 from datetime import timedelta
@@ -45,6 +50,25 @@ async def lifespan(application):
     db.Session=async_sessionmaker(engine,expire_on_commit=False)
     async with db.Session.begin() as session:
         session.add(Account(id=1,initial_bankroll=1100))
+        if os.getenv('QA_NHL_STATISTICS')=='true':
+            # Actual tested data, an explicitly illustrative matchup and a local
+            # disposable database. No real fixture or live source is fabricated.
+            from pathlib import Path
+            import json
+            from app.nhl_advanced import build_batch,CACHE_KEY
+            from app import nhl_advanced
+            folder=Path(__file__).resolve().parents[2]/'artifacts/nhl-low-cost-provider-research/moneypuck-offline-test/compressed-2026-10-14'
+            reference=json.loads((folder/'nhl/nhl-score-2026-10-13.json').read_text(encoding='utf-8'))
+            sources={'team':json.loads((folder/'download.json').read_text(encoding='utf-8')),'goalie':json.loads((folder/'goalies/download.json').read_text(encoding='utf-8'))}
+            batch=build_batch(folder/'all_teams.csv',folder/'goalies/goalies.zip',now().date(),reference,sources)
+            session.add(ProviderState(provider=CACHE_KEY,info=batch))
+            session.add(Fixture(id='qa:nhl-stats',sport='NHL',home='Edmonton Oilers',away='Toronto Maple Leafs',
+                commence_time=now()+timedelta(hours=3),state=State.HOLD,
+                reason='Local statistics test: illustrative matchup, not an official scheduled game.',
+                metrics={'home_abbrev':'EDM','away_abbrev':'TOR'},gates={}))
+            async def no_network_sync(**kwargs):
+                return {'status':'disabled_in_offline_qa'}
+            nhl_advanced.sync=no_network_sync
         if os.getenv('QA_MATCH_FEED')=='true':
             games=[]
             for index,(state,decision,hours) in enumerate([('FUT',State.HOLD,2),('LIVE',State.PASS,-1),('OFF',State.WATCH,-4)]):

@@ -4,6 +4,8 @@ Reviewed October 13, 2026 for the active XUOIR/Sports-Intelligence-V.01 project.
 
 ## Decision
 
+**October 14 test update:** the bounded MoneyPuck game-history audit, compressed transport, refreshed goalie pairing, isolated import and matchup UI checks passed. See [results and release safeguards](NHL_MONEYPUCK_TEST_RESULTS.md). This supersedes the earlier unknown archive-size finding; historical model approval and starter confirmation remain unresolved.
+
 **Owner's budget correction:** Sportlogiq is excluded from the active NHL shortlist. Its actual price remains unverified; the suggested $5,000+/month is not a provider quote. Keep quote-only enterprise products as curiosity/background research, without vendor outreach, trials or additional integration work. The practical release proceeds with no additional data subscription. Published low-cost subscriptions remain optional and unpurchased.
 
 **Best practical setup now:** existing NHL API for scores/basic data + MoneyPuck's permitted noncommercial published downloads for advanced statistics + manual confirmation from an original starter report. Keep the current free/manual odds integration. Additional data subscriptions: **$0**. This selects the next source to integrate; it does not declare the model ready or an adapter deployed.

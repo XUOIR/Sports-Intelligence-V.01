@@ -46,6 +46,8 @@ class Settings:
     llm_request_usd: Decimal = dollar_limit('LLM_REQUEST_USD', '.01')
     nhl_daily_requests: int = bounded_int("NHL_DAILY_REQUESTS", 300, 0, 500)
     nhl_score_daily_requests: int = bounded_int('NHL_SCORE_DAILY_REQUESTS', 1500, 0, 2000)
+    nhl_advanced_enabled: bool = os.getenv('ENABLE_NHL_ADVANCED_STATS', 'false').lower() == 'true'
+    nhl_advanced_monthly_bytes: int = bounded_int('NHL_ADVANCED_MONTHLY_BYTES', 1_500_000_000, 0, 1_500_000_000)
     allowed_origin: str = os.getenv("FRONTEND_ORIGIN", "http://localhost:3000")
     dashboard_url: str = 'https://sports-intelligence-dashboard.onrender.com/'
     odds_refreshes_24h: int = bounded_int('ODDS_REFRESHES_24H',5,0,5)

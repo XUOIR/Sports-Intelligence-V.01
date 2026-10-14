@@ -15,6 +15,7 @@ from .http import ProviderError
 from .limits import limits, BudgetExceeded
 from .config import settings
 from .readiness import validated_model
+from .nhl_advanced import frozen_context
 
 async def freeze(fixture_id: str):
     async with db.Session.begin() as session:
@@ -58,13 +59,14 @@ async def freeze(fixture_id: str):
                 return
             p = None
             fixture.state, fixture.reason = State.HOLD, f"Advanced factors missing: {str(exc)[:200]}"
+        advanced_context=await frozen_context(session,fixture,anchor)
         if now()>anchor+timedelta(seconds=5):
             fixture.state,fixture.reason=State.HOLD,"Anchor processing deadline exceeded; no late snapshot"
             return
         session.add(Snapshot(fixture_id=fixture_id, anchor_at=anchor, game_date=aware(fixture.commence_time).date(), vector=vector,
             evidence_ids=[r.id for r in selected.values()], baseline_home_probability=p, model_version=MODEL_VERSION,
             context={"sources": {k:{"source_at":aware(r.source_at).isoformat(),"observed_at":aware(r.observed_at).isoformat(),"payload":r.payload} for k,r in selected.items()},
-                "factors":factor_source.payload if factor_source else {}}))
+                "factors":factor_source.payload if factor_source else {},"nhl_statistics":advanced_context}))
         fixture.dirty = True
 
 def recommendation_state(gates: dict, *, has_execution: bool, personnel: bool, edge: Decimal | None, frozen: bool):

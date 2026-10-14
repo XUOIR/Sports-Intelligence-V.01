@@ -9,7 +9,7 @@ async function proxy(request: NextRequest,{params}:{params:Promise<{path:string[
   const allowed = path.length===1 && ['dashboard','bets','operations','matches'].includes(path[0])
     || path.length===2 && path[0]==='matches' && path[1]==='sync'
     || path.length===2 && ['fixtures','bets'].includes(path[0])
-    || path.length===2 && path[0]==='operations' && ['pause','resume','allowances','odds-refresh'].includes(path[1])
+    || path.length===2 && path[0]==='operations' && ['pause','resume','allowances','odds-refresh','nhl-statistics-refresh'].includes(path[1])
     || path.length===3 && path[0]==='operations' && path[1]==='odds-refresh'
     || path.length===3 && path[0]==='fixtures' && path[2]==='evidence';
   if(!allowed || path.some(p=>!/^[-a-zA-Z0-9_:]+$/.test(p)))return NextResponse.json({detail:'Unknown endpoint'},{status:404});
