@@ -65,6 +65,26 @@ async def test_cache_refresh_deadline_is_request_start_not_completion(database,m
         assert matches.aware(cached.info['next_at'])==start+timedelta(seconds=30)
 
 @pytest.mark.asyncio
+async def test_consecutive_ticks_tolerate_database_lease_jitter(database,monkeypatch):
+    import app.limits as module
+    start=now();at=start;calls=[]
+    monkeypatch.setattr(matches,'now',lambda:at)
+    monkeypatch.setattr(module,'now',lambda:at)
+    class DelayedLease(Limits):
+        async def lease(self,key,seconds=300):
+            nonlocal at
+            at+=timedelta(seconds=1.5)
+            return await super().lease(key,seconds)
+    class Response:
+        async def request(self,*args,**kwargs):calls.append(at);return payload()
+    monkeypatch.setattr(matches,'limits',DelayedLease())
+    monkeypatch.setattr(matches,'http',Response())
+    for offset in (0,30,60):
+        at=start+timedelta(seconds=offset)
+        await matches.refresh_day(at.date())
+    assert len(calls)==3
+
+@pytest.mark.asyncio
 async def test_shared_cache_many_readers_cannot_use_paid_credits(database,monkeypatch):
     calls=[]
     def mock(request):calls.append(request);return httpx.Response(200,json=payload())

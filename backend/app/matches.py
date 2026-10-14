@@ -80,7 +80,7 @@ def interval(games,day):
 
 def due(cached):
     # The scheduler is on a fixed cadence. Allow a small timer/DB jitter window,
-    # while the durable 29-second leases prevent fast repeats across instances.
+    # while the durable leases prevent concurrent repeats across instances.
     return not cached or aware(cached.info['next_at'])<=now()+timedelta(seconds=2)
 
 async def enqueue(day):
@@ -95,7 +95,7 @@ async def refresh_day(day):
     async with db.Session() as session:
         cached=await session.get(ProviderState,f'nhl-score:{day}')
         if not due(cached):return
-    if not await limits.lease(f'nhl-score:{day}',29):return
+    if not await limits.lease(f'nhl-score:{day}',25):return
     try:
         started=now()
         games=parse_scores(await http.request('nhl_scores','GET',f'https://api-web.nhle.com/v1/score/{day}'),day)
@@ -110,7 +110,7 @@ async def refresh_day(day):
 
 async def tick():
     if 'NHL' not in settings.active_sports or not settings.nhl_score_daily_requests:return
-    if not await limits.lease('nhl-score-tick',29) or await limits.blocked('nhl_scores'):return
+    if not await limits.lease('nhl-score-tick',25) or await limits.blocked('nhl_scores'):return
     today=now().date()
     async with db.Session() as session:
         pending=(await session.scalars(select(ProviderState).where(ProviderState.provider.like('nhl-request:%'))
