@@ -10,7 +10,7 @@ from .clock import now, aware
 from .config import PACIFIC,settings
 from .models import Fixture, Snapshot, MarketOdds, Evidence, EvaluationCycle, RuntimeLimit, AuditLog
 from .limits import limits,BudgetExceeded
-from .ingestion import ingest_nhl, ingest_esports, ingest_odds, ingest_results, ingest_nhl_personnel
+from .ingestion import ingest_nhl, ingest_esports, ingest_results, ingest_nhl_personnel
 from .engine import freeze, evaluate
 
 log = logging.getLogger("scheduler")
@@ -36,13 +36,6 @@ async def refresh_nhl():
 async def daily_nhl():
     await ingest_nhl(history=True)
     await anchors()
-
-async def market_cycle():
-    moved = await ingest_odds()
-    for fid in sorted(moved)[:30]:
-        await evaluate(fid)  # Uses the batch PlayNow quotes, no recursive upstream request.
-    await anchors()
-    await gates_cycle()
 
 async def prepare_anchors():
     async with db.Session() as session:
@@ -88,9 +81,7 @@ def start():
     scheduler.add_job(guarded, "interval", hours=1, args=["nhl-refresh",refresh_nhl], id="nhl-refresh")
     if set(settings.active_sports)&{'CS2','VAL','LOL'} and settings.pandascore_daily_requests:
         scheduler.add_job(guarded, "interval", hours=2, args=["esports",ingest_esports,1800], id="esports")
-    # The five-minute wake-up reads local state. A durable two-hour request
-    # identity admits at most one paid batch per sport, even after redeploys.
-    scheduler.add_job(guarded, "interval", minutes=5, args=["odds",market_cycle,240], id="odds")
+    # Odds are requested only through the authenticated manual refresh endpoint.
     scheduler.add_job(guarded, "interval", minutes=1, args=["nhl-preparation",prepare_anchors,55], id="nhl-preparation")
     scheduler.add_job(guarded, "interval", minutes=1, args=["gates",gates_cycle,55], id="gates")
     scheduler.add_job(guarded, "interval", hours=4, args=["results",ingest_results], id="results")
@@ -99,4 +90,3 @@ def start():
     scheduler.start()
     # Bounded startup recovery; no catch-up of missed paid cron runs.
     scheduler.add_job(guarded, "date", args=["startup",daily_nhl,1800], run_date=now()+timedelta(seconds=2), id="startup")
-    scheduler.add_job(guarded, "date", args=["odds",market_cycle,240],run_date=now()+timedelta(seconds=30),id='odds-startup')

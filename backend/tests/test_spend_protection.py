@@ -65,7 +65,7 @@ async def test_no_budget_or_identity_no_paid_admission(database):
     async with database() as session:assert await session.scalar(select(func.count()).select_from(ProviderCall))==0
 
 async def test_pause_persists_and_does_not_reset_spend(database):
-    guard=Limits();await guard.reserve('odds',3,identity='first')
+    guard=Limits();first=await guard.reserve('odds',3,identity='first');await guard.finish(first,'SUCCEEDED')
     await guard.pause(True)
     with pytest.raises(BudgetExceeded):await Limits().reserve('odds',3,identity='second')
     await Limits().pause(False)
@@ -118,7 +118,7 @@ async def test_fixture_lifetime_cap_cannot_be_reset_by_new_cycles(database,monke
 async def test_odds_monthly_cap_cannot_be_exceeded_or_consume_rejected_identity(database,monkeypatch):
     import app.limits as module
     monkeypatch.setattr(module,'settings',replace(settings,odds_daily_credits=12,odds_monthly_credits=5))
-    await Limits().reserve('odds',3,identity='allowed')
+    first=await Limits().reserve('odds',3,identity='allowed');await Limits().finish(first,'SUCCEEDED')
     with pytest.raises(BudgetExceeded):await Limits().reserve('odds',3,identity='rejected')
     assert not await Limits().attempted('odds','rejected')
     async with database() as session:

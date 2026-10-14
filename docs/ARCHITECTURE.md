@@ -40,7 +40,7 @@ All application timestamps use timezone-aware `America/Vancouver`. PostgreSQL `t
 | NHL history and fatigue collection | Daily 04:00 Vancouver | One instance; bounded team count; no target-date games |
 | NHL schedule/standings + available personnel details | Hourly, plus pre-anchor preparation | Histories cached four hours with original timestamps; at most six imminent game details per cycle |
 | PandaScore upcoming/recent matches and rosters | Disabled in NHL phase | Later requires appropriate license, verified contracts, and explicit activation |
-| Sportsbook prices | Local wake every five minutes; paid batch at most once per two-hour period | NHL only; 48-hour horizon; skip absent official fixtures; three exact market types |
+| Sportsbook prices | Manual only; five attempts per rolling 24 hours | NHL only; 48-hour horizon; skip absent official fixtures; three exact market types |
 | Frozen snapshot | Official start minus 30 minutes | Date trigger; all source observations must precede cutoff; max five seconds processing delay |
 | Gate refresh | Every minute | Database only; max 60 imminent fixtures; no background paid loop |
 | NHL/esports final outcomes | Every four hours | Bounded unresolved fixtures; final scores never settle tickets automatically |
@@ -53,11 +53,12 @@ Scheduler jobs coalesce missed interval triggers and allow one concurrent run ea
 
 | Boundary | Default |
 |---|---:|
-| Odds credits per Pacific day | 120 |
+| Odds credits per Pacific day | 15 |
+| Odds refresh attempts per rolling 24 hours | 5; failures and uncertain attempts count |
 | Odds credits per Pacific month | 500 |
 | PandaScore HTTP attempts per day | 0 |
-| OpenRouter HTTP attempts per day | 12 |
-| OpenRouter USD per day / month | 0 / 0 (paid AI disabled) |
+| OpenRouter HTTP attempts per day | 30 configured on Render |
+| OpenRouter USD per day / month | 0.30 / 3 configured on Render; unconfigured local defaults remain 0 / 0 |
 | OpenRouter USD reservation per review | 0.01 |
 | NHL HTTP attempts per day | 300 |
 | Attempts per HTTP cycle | Paid: 1; free: up to 3 for bounded redirects or short 429 cooldowns |

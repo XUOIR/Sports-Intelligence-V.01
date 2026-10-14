@@ -16,7 +16,7 @@ from uuid import UUID
 from urllib.parse import parse_qs,urlsplit
 from fastapi import FastAPI, Depends, HTTPException, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse,RedirectResponse
 from pydantic import BaseModel, Field, ConfigDict, field_validator,StrictBool,HttpUrl
 from sqlalchemy import select, func, text
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
@@ -31,8 +31,10 @@ from app.providers import complete_roster
 from app.performance import performance
 from app.readiness import fresh_recommendation
 from app.operations import operational_status
-from app.limits import limits
+from app.limits import limits,BudgetExceeded
 from app.allowances import provider_allowances
+from app import manual_odds
+from app.http import ProviderError
 
 @asynccontextmanager
 async def lifespan(application):
@@ -112,6 +114,10 @@ def safe_fixture(fixture):
 async def live():
     return {"status":"alive", "timezone":"America/Vancouver"}
 
+@app.api_route('/',methods=['GET','HEAD'],include_in_schema=False)
+async def dashboard_entry():
+    return RedirectResponse(settings.dashboard_url,status_code=307)
+
 @app.get("/health/ready")
 async def ready(session=Depends(database)):
     await session.execute(text("SELECT 1 FROM fixtures LIMIT 1"))
@@ -142,6 +148,22 @@ async def operations(session=Depends(database)):
 @app.post('/operations/allowances',dependencies=[Depends(authorize)])
 async def allowances():
     return {'providers':await provider_allowances()}
+
+class OddsRefreshInput(BaseModel):
+    model_config=ConfigDict(extra='forbid')
+    request_id:UUID
+
+@app.post('/operations/odds-refresh',dependencies=[Depends(authorize)])
+async def refresh_odds(body:OddsRefreshInput):
+    if db.Session is None:raise HTTPException(503,'Database is not configured')
+    try:return await manual_odds.refresh(body.request_id)
+    except BudgetExceeded as exc:raise HTTPException(429,str(exc)) from None
+    except ProviderError as exc:raise HTTPException(503,str(exc)) from None
+
+@app.get('/operations/odds-refresh/{request_id}',dependencies=[Depends(authorize)])
+async def odds_refresh_status(request_id:UUID):
+    if db.Session is None:raise HTTPException(503,'Database is not configured')
+    return await manual_odds.lookup(request_id) or {'request_id':str(request_id),'status':'not_sent'}
 
 class PauseInput(BaseModel):
     model_config=ConfigDict(extra='forbid')

@@ -12,7 +12,7 @@ FastAPI + Supabase PostgreSQL + Next.js, deployed to Render from `XUOIR/Sports-I
 
 ## Data sources and deliberate locks
 
-The Odds API supplies prices. NHL schedule, standings, team season schedules, game-center details, and final scores come from `https://api-web.nhle.com/v1/`. Advanced factors and confirmed starters require source-backed operator evidence until a suitable feed is verified. The active phase is NHL; CS2 follows, then MLB. PandaScore ingestion is disabled pending the required betting-use license and field contracts. OpenRouter is a final adversarial review after deterministic gates pass, and paid AI remains disabled until both USD budgets and a matching provider-side monthly key limit are set.
+The Odds API supplies prices. NHL schedule, standings, team season schedules, game-center details, and final scores come from `https://api-web.nhle.com/v1/`. Advanced factors and confirmed starters require source-backed operator evidence until a suitable feed is verified. The active phase is NHL; CS2 follows, then MLB. PandaScore ingestion is disabled pending the required betting-use license and field contracts. OpenRouter is a final adversarial review after deterministic gates pass, and the user-approved AI budget is US$3/month with a matching provider-side key limit. The app still refuses paid reviews unless both limits are configured and verified.
 
 The Odds API documents PlayNow as **`playnow_ca`**. The adapter explicitly normalizes it to `playnow`; `bclc` also qualifies. No other bookmaker qualifies as the execution source. A missing, withdrawn, anomalous, future-dated, or stale quote closes the price gate immediately. Pinnacle movement compares the same market, selection, and exact numerical line. A 1.00 percentage point change requests re-evaluation against the PlayNow quotes in that batch, without recursively requesting more odds.
 
@@ -23,7 +23,7 @@ The Odds API documents PlayNow as **`playnow_ca`**. The adapter explicitly norma
 - No esports price key is assumed to exist in The Odds API. Esports stay under observation without a verified PlayNow price adapter. CS2 has baseline weights; VAL/LOL/NBA/MLB/NFL have no invented probability model.
 - The 15-feature vector is built when all required standings/history evidence exists. Esports recent win rate is not silently substituted for NHL season points percentage.
 - The initial NHL/CS2 weights are **uncalibrated baselines**. RECOMMEND is disabled until an explicitly approved, compatible historical validation exists and all eight factual gates plus adversarial review pass. At least 300 training, 100 calibration, and 100 test records are required *after* date embargoes.
-- Odds ingestion runs every two hours. An individual execution quote expires after five minutes. The visible stale warning and sparse recommendation availability between batches are intentional cost/freshness consequences. No hidden faster polling is added.
+- Odds ingestion is manual only, with five attempts per rolling 24 hours and three credits reserved per batch. Attempts, including failures, survive reloads and deployments. An individual execution quote expires after five minutes; a manual refresh cannot keep prices current all day. The separate Reload dashboard button reads stored data without spending odds credits.
 - The 48-hour `SELECT 1` pulse is implemented, but it is not a guarantee against free-tier Supabase pausing. Choose an appropriate paid database plan for a production uptime requirement.
 
 ## Security and existing environment

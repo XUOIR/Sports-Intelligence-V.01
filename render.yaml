@@ -24,7 +24,9 @@ services:
       - key: ENABLE_SCHEDULER
         value: "true"
       - key: ODDS_DAILY_CREDITS
-        value: "120"
+        value: "15"
+      - key: ODDS_REFRESHES_24H
+        value: "5"
       - key: ODDS_MONTHLY_CREDITS
         value: "500"
       - key: ACTIVE_SPORTS
@@ -32,11 +34,11 @@ services:
       - key: PANDASCORE_DAILY_REQUESTS
         value: "0"
       - key: LLM_DAILY_REQUESTS
-        value: "12"
+        value: "30"
       - key: LLM_DAILY_USD
-        value: "0"
+        value: "0.30"
       - key: LLM_MONTHLY_USD
-        value: "0"
+        value: "3"
       - key: LLM_REQUEST_USD
         value: "0.01"
       - key: NHL_DAILY_REQUESTS

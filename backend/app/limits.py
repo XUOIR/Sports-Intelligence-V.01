@@ -1,7 +1,7 @@
 import hashlib
 from datetime import timedelta
 from decimal import Decimal
-from sqlalchemy import select, update
+from sqlalchemy import select, update,or_,and_
 from sqlalchemy.dialects.postgresql import insert
 from . import db
 from .clock import now, aware
@@ -48,6 +48,14 @@ class Limits:
                 raise BudgetExceeded('Paid requests paused by the operator')
             if circuit and (circuit.used or circuit.blocked_until and aware(circuit.blocked_until)>at):
                 raise BudgetExceeded(f'{provider} circuit open')
+            if request_id and await session.get(ProviderCall,request_id):
+                raise BudgetExceeded('This paid request was already attempted; automatic repetition disabled')
+            if provider=='odds':
+                window=await self.odds_window(session)
+                if window['in_progress'] or window['needs_resume']:
+                    raise BudgetExceeded('A previous odds refresh is unfinished; check its status before another request')
+                if not window['remaining']:
+                    raise BudgetExceeded('The five-refresh limit for the rolling 24-hour window has been reached')
             if request_id:
                 admitted=await session.execute(insert(ProviderCall).values(id=request_id,provider=provider,
                     fixture_id=fixture_id,units=cost,reserved_usd=usd,status='STARTED',response_metadata={},created_at=at,updated_at=at)
@@ -79,8 +87,27 @@ class Limits:
     async def finish(self, request_id, status, *, category=None, metadata=None):
         if not request_id:return
         async with db.Session.begin() as session:
-            await session.execute(update(ProviderCall).where(ProviderCall.id==request_id).values(
-                status=status,error_category=category,response_metadata=metadata or {},updated_at=now()))
+            row=await session.get(ProviderCall,request_id,with_for_update=True)
+            if row:
+                row.status,row.error_category,row.updated_at=status,category,now()
+                row.response_metadata={**row.response_metadata,**(metadata or {})}
+
+    async def odds_window(self,session=None):
+        if session is None:
+            async with db.Session() as opened:return await self.odds_window(opened)
+        at=now();cutoff=at-timedelta(hours=24)
+        rows=(await session.scalars(select(ProviderCall).where(ProviderCall.provider=='odds',or_(
+            ProviderCall.created_at>cutoff,ProviderCall.status=='STARTED',and_(ProviderCall.status=='SUCCEEDED',
+                ProviderCall.fixture_id.like('odds-refresh:%')))).order_by(ProviderCall.created_at))).all()
+        recent=[r for r in rows if aware(r.created_at)>cutoff]
+        pending=[r for r in rows if r.status=='STARTED' or r.status=='SUCCEEDED' and r.fixture_id and r.fixture_id.startswith('odds-refresh:') and r.response_metadata.get('odds_sync_status')!='complete']
+        maximum=settings.odds_refreshes_24h
+        next_at=aware(recent[len(recent)-maximum].created_at)+timedelta(hours=24) if maximum and len(recent)>=maximum else None
+        return {'limit':maximum,'used':len(recent),'remaining':max(0,maximum-len(recent)),
+            'next_available_at':next_at,'credit_cost':3,'mode':'manual',
+            'in_progress':any(at-aware(r.created_at)<=timedelta(seconds=60) for r in pending),
+            'needs_resume':any(at-aware(r.created_at)>timedelta(seconds=60) for r in pending),
+            'active_request_id':next((r.fixture_id.split(':',1)[1] for r in pending if r.fixture_id and r.fixture_id.startswith('odds-refresh:')),None)}
 
     async def observe(self, provider, info):
         async with db.Session.begin() as session:
@@ -123,6 +150,13 @@ class Limits:
         if provider not in PAID:raise ValueError('Unknown paid provider')
         async with db.Session.begin() as session:
             await session.execute(update(RuntimeLimit).where(RuntimeLimit.key==f'circuit:{provider}').values(used=0,blocked_until=None))
+            if provider=='odds':
+                unfinished=(await session.scalars(select(ProviderCall).where(ProviderCall.provider=='odds',
+                    ProviderCall.created_at<now()-timedelta(seconds=60),or_(ProviderCall.status=='STARTED',
+                        and_(ProviderCall.status=='SUCCEEDED',ProviderCall.fixture_id.like('odds-refresh:%')))))).all()
+                for row in unfinished:
+                    if row.status=='STARTED' or row.response_metadata.get('odds_sync_status')!='complete':
+                        row.status,row.error_category,row.updated_at='UNKNOWN','InterruptedRefresh',now()
             session.add(AuditLog(action='PROVIDER_RESUMED',entity_id=provider,details={}))
         # Existing request identities and spend reservations are never reset.
 

@@ -26,12 +26,14 @@ def array(value, key: str | None = None, limit=100):
         raise ProviderError(f"Malformed provider row: {key or 'root'}")
     return data
 
-async def odds(sport: str):
+async def odds(sport: str,*,refresh_id=None):
     if sport not in settings.active_sports or not settings.odds_key:
         return []
-    identity=f'{sport}:{int(now().timestamp())//7200}'
+    if not refresh_id:
+        raise BudgetExceeded('Odds refreshes require an explicit manual request')
+    identity=f'manual:{sport}:{refresh_id}'
     if await limits.attempted('odds',identity):
-        raise BudgetExceeded('This two-hour odds batch was already attempted')
+        raise BudgetExceeded('This manual odds refresh was already attempted')
     quota=await limits.observation('odds',max_age=900)
     if quota is None:
         try:
@@ -50,7 +52,7 @@ async def odds(sport: str):
     start, end = now(), now() + timedelta(hours=48)
     try:
         return array(await http.request("odds", "GET", f"https://api.the-odds-api.com/v4/sports/{ODDS_SPORTS[sport]}/odds/",
-            cost=3,identity=identity,params={"apiKey": settings.odds_key, "bookmakers": "playnow_ca,pinnacle", "markets": "h2h,spreads,totals",
+            cost=3,identity=identity,fixture_id=f'odds-refresh:{refresh_id}',params={"apiKey": settings.odds_key, "bookmakers": "playnow_ca,pinnacle", "markets": "h2h,spreads,totals",
             "oddsFormat": "decimal", "dateFormat": "iso",
             "commenceTimeFrom":start.astimezone(timezone.utc).isoformat(timespec='seconds').replace('+00:00','Z'),
             "commenceTimeTo":end.astimezone(timezone.utc).isoformat(timespec='seconds').replace('+00:00','Z')}), limit=150)

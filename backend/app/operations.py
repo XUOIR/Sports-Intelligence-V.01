@@ -7,6 +7,7 @@ from .config import settings
 from .models import RuntimeLimit,ProviderCall,ProviderState,Fixture,Snapshot,ModelValidation,MarketOdds
 from .readiness import validated_model
 from .model_config import NHL_WEIGHTS
+from .limits import limits as guard
 
 async def operational_status(session):
     at=now()
@@ -60,4 +61,5 @@ async def operational_status(session):
         'nhl':{'upcoming':len(future),'fresh_price_pairs':prices,'confirmed_personnel':personnel,'advanced_factors':factors,
             'frozen_inputs':len(snapshots),'usable_frozen_inputs':usable,'labeled_training_records':int(mature or 0),
             'model_approved':validated_model(model),'required_partitions':[300,100,100]},
-        'server_time':at,'odds_interval_minutes':120,'cost_note':'Budgets retain failed and unconfirmed reservations. They are conservative limits, not a provider invoice.'}
+        'server_time':at,'odds_interval_minutes':None,'odds_refresh':await guard.odds_window(session),
+        'cost_note':'Budgets retain failed and unconfirmed reservations. They are conservative limits, not a provider invoice.'}

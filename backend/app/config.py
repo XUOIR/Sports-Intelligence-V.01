@@ -37,7 +37,7 @@ class Settings:
     scheduler: bool = os.getenv("ENABLE_SCHEDULER", "false").lower() == "true"
     max_response_bytes: int = bounded_int("MAX_RESPONSE_BYTES", 1_000_000, 1024, 2_000_000)
     active_sports: tuple[str, ...] = active_sports()
-    odds_daily_credits: int = bounded_int("ODDS_DAILY_CREDITS", 120, 0, 1000)
+    odds_daily_credits: int = bounded_int("ODDS_DAILY_CREDITS", 15, 0, 1000)
     odds_monthly_credits: int = bounded_int('ODDS_MONTHLY_CREDITS', 500, 0, 100000)
     pandascore_daily_requests: int = bounded_int("PANDASCORE_DAILY_REQUESTS", 0, 0, 1000)
     llm_daily_requests: int = bounded_int("LLM_DAILY_REQUESTS", 12, 0, 100)
@@ -46,6 +46,8 @@ class Settings:
     llm_request_usd: Decimal = dollar_limit('LLM_REQUEST_USD', '.01')
     nhl_daily_requests: int = bounded_int("NHL_DAILY_REQUESTS", 300, 0, 500)
     allowed_origin: str = os.getenv("FRONTEND_ORIGIN", "http://localhost:3000")
+    dashboard_url: str = 'https://sports-intelligence-dashboard.onrender.com/'
+    odds_refreshes_24h: int = bounded_int('ODDS_REFRESHES_24H',5,0,5)
 
     @property
     def llm_enabled(self):

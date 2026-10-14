@@ -204,7 +204,7 @@ async def ingest_esports():
                     log.warning("PandaScore payload structure changed: %s", type(exc).__name__)
             await session.commit()
 
-async def ingest_odds():
+async def ingest_odds(*,refresh_id=None):
     reevaluate = set()
     for sport in providers.ODDS_SPORTS:
         if sport not in settings.active_sports:continue
@@ -212,7 +212,7 @@ async def ingest_odds():
             scheduled=await session.scalar(select(Fixture.id).where(Fixture.sport==sport,
                 Fixture.commence_time>now(),Fixture.commence_time<=now()+timedelta(hours=48)).limit(1))
         if sport=='NHL' and not scheduled:continue
-        rows = await providers.odds(sport)
+        rows = await providers.odds(sport,refresh_id=refresh_id) if refresh_id else await providers.odds(sport)
         async with db.Session() as session:
             for row in rows:
                 try:
