@@ -27,3 +27,16 @@ At 4:01 PM, production independently showed a newly captured Montréal–Washing
 The remaining forecast work is a documented, reproducible normalization from the advanced facts into all four weighted model inputs, verified starting goalies and an adequate genuine historical validation corpus. Existing acceptance requires at least 300 training, 100 calibration and 100 untouched test records after date embargoes. Available xG percentages, a passed software test or an AI opinion cannot substitute for these. Recommendations remain on HOLD/WATCH until the actual requirements pass.
 
 Deployment, live spending checks and outcome reconciliation results are recorded below after verification.
+
+## Verified rollout and data repair — 4:14 PM Pacific
+
+Both existing paid Docker services are live on `68b71455900972bb20b2b13932f40b1969885743`:
+
+- Backend `dep-db80o19srm7s7389cf90`, submitted 4:11:01 PM, live 4:11:39 PM. Alembic pre-deploy completed, startup passed and readiness returned 200.
+- Frontend `dep-db80o30u01pc738fhjj0`, submitted 4:11:08 PM, live 4:12:19 PM. The production Next.js build and startup passed.
+
+One explicit allowance check through the live Settings page used only free metadata. It saved and displayed OpenRouter daily/monthly spending **US$0.00**, app reservations **US$0.00**, daily ceiling **US$0.30** and monthly ceiling **US$3.00**. The provider key remains capped at US$3 with monthly reset and the wallet at US$10. Odds API usage remains **9 used / 491 remaining**; PandaScore checks were skipped. The main navigation contains Overview, Model performance, Bankroll, Settings and Sign out; Reload saved data sits in the data-status row and was exercised without a paid request. Live cards still show real xG and expired-price labels with no forecast or betting edge. Anonymous backend/proxy reads returned 401 and private pages redirected to login.
+
+The local maintenance connection failed to authenticate; no secret was printed, reset or changed. The connected Supabase session independently verified the four existing fixture outcomes and recovered exactly those four missing snapshot labels, guarded by null outcome, null baseline, null prediction and null Brier conditions. Four audit records record the recovery. No upstream request, wager mutation or forecast was involved. A subsequent independent query confirmed five raw snapshots, four attached outcomes, zero baseline records, zero model predictions and zero Brier scores. The recovered legacy records remain ineligible for current-model calibration.
+
+Both temporary QA servers were stopped and the mobile viewport override reset. No metered feed was paused/resumed, and no reservation, cap, service plan or credential was reset. The next required model work remains normalization plus authentic validation data and starter evidence; no passing test or recovered outcome is represented as a live approved model.
