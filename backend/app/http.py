@@ -19,7 +19,7 @@ class SafeHTTP:
         method=method.upper()
         if self.transport is None:
             target=httpx.URL(url)
-            hosts={'nhl':'api-web.nhle.com','odds':'api.the-odds-api.com','odds_meta':'api.the-odds-api.com',
+            hosts={'nhl':'api-web.nhle.com','nhl_scores':'api-web.nhle.com','odds':'api.the-odds-api.com','odds_meta':'api.the-odds-api.com',
                 'pandascore':'api.pandascore.co','pandascore_meta':'api.pandascore.co',
                 'openrouter':'openrouter.ai','openrouter_meta':'openrouter.ai','openrouter_wallet':'openrouter.ai'}
             if provider not in hosts or target.scheme!='https' or target.host!=hosts[provider] or target.port not in (None,443) or target.userinfo:
@@ -30,15 +30,20 @@ class SafeHTTP:
         request_id=None
         metadata={}
         try:
-            async with asyncio.timeout(15 if provider.startswith('openrouter') else 45):
+            async with asyncio.timeout(15 if provider.startswith('openrouter') or provider=='nhl_scores' else 45):
                 async with httpx.AsyncClient(timeout=15,follow_redirects=False,transport=self.transport) as client:
                     # Paid requests get one attempt, including 429s. An uncertain
                     # response is never followed by another billable request.
-                    for attempt in range(1 if paid else 3):
+                    for attempt in range(1 if paid or provider=='nhl_scores' else 3):
                         request_id=await self.guard.reserve(provider,cost,identity=identity or cycle_id,usd=usd,fixture_id=fixture_id,cycle_id=cycle_id)
                         async with client.stream(method,url,**kwargs) as response:
                             status=response.status_code
                             if status==429:
+                                if provider=='nhl_scores':
+                                    try:cooldown=int(response.headers.get('retry-after','900'))
+                                    except ValueError:cooldown=900
+                                    await self.guard.trip(provider,min(86400,max(900,cooldown)))
+                                    raise ProviderError('NHL scores rate limited; cooldown active')
                                 if paid:raise ProviderError('Rate limited; paid request halted without retry')
                                 if attempt==2:raise ProviderError('Rate-limit retry cap reached')
                                 try:
@@ -104,7 +109,7 @@ class SafeHTTP:
             raise
         except (TimeoutError,httpx.HTTPError,ProviderError) as exc:
             category=type(exc).__name__
-            await self.guard.trip(provider)
+            if paid or not await self.guard.blocked(provider):await self.guard.trip(provider)
             if request_id:await self.guard.finish(request_id,'UNKNOWN' if isinstance(exc,(TimeoutError,httpx.HTTPError)) else 'FAILED',category=category,metadata=metadata)
             # HTTP exception strings can contain secret query parameters.
             if isinstance(exc,ProviderError):raise

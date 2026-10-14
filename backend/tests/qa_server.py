@@ -10,7 +10,7 @@ from uuid import uuid4
 from sqlalchemy.ext.asyncio import create_async_engine,async_sessionmaker
 from app.api import app
 from app import db
-from app.models import Base,Account,Fixture,State,PersonalBet,Outcome
+from app.models import Base,Account,Fixture,State,PersonalBet,Outcome,ProviderState
 from app.model_config import GATE_NAMES
 from app.clock import now
 
@@ -45,6 +45,20 @@ async def lifespan(application):
     db.Session=async_sessionmaker(engine,expire_on_commit=False)
     async with db.Session.begin() as session:
         session.add(Account(id=1,initial_bankroll=1100))
+        if os.getenv('QA_MATCH_FEED')=='true':
+            games=[]
+            for index,(state,decision,hours) in enumerate([('FUT',State.HOLD,2),('LIVE',State.PASS,-1),('OFF',State.WATCH,-4)]):
+                fid=f'nhl:{index+1}';start=now()+timedelta(hours=hours)
+                session.add(Fixture(id=fid,sport='NHL',home=f'QA Home {index+1}',away=f'QA Away {index+1}',commence_time=start,
+                    state=decision,reason='Disposable local QA match. No real betting evidence.',metrics={},gates={}))
+                games.append({'id':fid,'sport':'NHL','home':f'QA Home {index+1}','away':f'QA Away {index+1}',
+                    'home_abbrev':'QAH','away_abbrev':'QAA','commence_time':start.isoformat(),'game_state':state,'schedule_state':'OK',
+                    'home_score':None if state=='FUT' else 3,'away_score':None if state=='FUT' else 1,
+                    'period':2,'period_type':'REG','clock':'14:21','intermission':False})
+            for days in [-1,0,1]:
+                day=now().date()+timedelta(days=days)
+                session.add(ProviderState(provider=f'nhl-score:{day}',observed_at=now(),info={
+                    'games':games if days==0 else [],'next_at':(now()+timedelta(minutes=30)).isoformat(),'interval_seconds':30}))
         if os.getenv("QA_FIXTURE") == "true":
             session.add(Fixture(id="qa:fixture",sport="NHL",home="QA Home",away="QA Away",commence_time=qa_start if os.getenv('QA_MANUAL_ODDS')=='true' else now()+timedelta(hours=3),
                 state=State.HOLD,reason="Disposable browser test. No real match or price.",metrics={},

@@ -77,6 +77,8 @@ async def retain():
         # Preserve snapshots/bets/audit history; attempt caps survive for fixture lifetime.
 
 def start():
+    from .matches import tick as scores_tick
+    scheduler.add_job(scores_tick,'interval',seconds=30,next_run_time=now(),id='nhl-scores')
     scheduler.add_job(guarded, CronTrigger(hour=4, minute=0, timezone=PACIFIC), args=["nhl-daily",daily_nhl,1800], id="nhl-daily")
     scheduler.add_job(guarded, "interval", hours=1, args=["nhl-refresh",refresh_nhl], id="nhl-refresh")
     if set(settings.active_sports)&{'CS2','VAL','LOL'} and settings.pandascore_daily_requests:

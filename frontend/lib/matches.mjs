@@ -1,0 +1,5 @@
+export function shiftDay(day,amount){const date=new Date(`${day}T12:00:00Z`);date.setUTCDate(date.getUTCDate()+amount);return date.toISOString().slice(0,10);}
+export function matchTime(value){if(!/[+-]\d{2}:\d{2}$/.test(value))return 'Time unavailable';return new Intl.DateTimeFormat('en-CA',{timeZone:'UTC',hour:'numeric',minute:'2-digit'}).format(new Date(value.replace(/[+-]\d{2}:\d{2}$/,'Z')));}
+export function matchAge(value,now=Date.now()){if(!value)return 'Awaiting score sync';const seconds=Math.max(0,Math.floor((now-Date.parse(value))/1000));return seconds<60?`Updated ${seconds}s ago`:seconds<3600?`Updated ${Math.floor(seconds/60)}m ago`:`Updated ${Math.floor(seconds/3600)}h ago`;}
+export function feedExpired(feed,now=Date.now()){return !feed||feed.stale||!feed.valid_until||now>Date.parse(feed.valid_until);}
+export function playVisible(game,feed,now=Date.now()){return !feedExpired(feed,now)&&game.verified_play&&game.decision==='RECOMMEND'&&['FUT','PRE'].includes(game.game_state)&&game.schedule_state==='OK'&&Date.parse(game.commence_time)>now;}

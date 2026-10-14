@@ -105,3 +105,13 @@ See `docs/QA_REPORT.md` for the exact checks performed and outstanding productio
 ## Failed Render pre-deploy recovery
 
 See [deployment recovery](docs/DEPLOYMENT_RECOVERY.md). The Alembic pre-deploy step is preserved; the connection validator now supports this project's Session Pooler without changing routes, scheduling, analytics, or the dashboard.
+
+## Private NHL workspace and match feed
+
+The full dashboard, Settings and temporary Development checklist require a valid dashboard session. Signed-out visitors are redirected to `/login`. Settings holds provider controls, allowances and the five-attempt manual odds refresh.
+
+A fixed match sidebar displays shared NHL scores with date navigation, live-first ordering and evidence-derived decision badges. Browser reads never fetch odds or AI; selected dates enter a bounded free-score queue. `NHL_SCORE_DAILY_REQUESTS=1500` caps score attempts independently of the existing statistical request limit. Source errors retain old scores with expired freshness and a cooldown.
+
+See [NHL release priorities and provider research](docs/NHL_RELEASE_PLAN.md) for the remaining data/model blockers and hand-picked product ideas. The current UI release does not imply a validated NHL betting edge.
+
+For disposable browser QA, build the frontend then run `python scripts/preview.py` with the local virtual environment. Its keys, database and scores are test-only; it does not run the production scheduler. `scripts/check_private_ui.py` checks local login, session integrity, CSRF and private routes without touching real providers or wagering records.

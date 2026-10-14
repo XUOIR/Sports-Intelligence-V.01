@@ -76,6 +76,8 @@ async def ingest_nhl_personnel():
 async def ingest_nhl(history=False):
     games, standings = await providers.nhl_schedule(), await providers.nhl_standings()
     by_abbrev = {name(s["teamAbbrev"]): s for s in standings}
+    team_names={name(row['teamAbbrev']):name(row['teamName']) for row in standings if row.get('teamName')}
+    if team_names:await limits.observe('nhl-team-names',{'teams':team_names})
     histories = {}
     history_times = {}
     if history:

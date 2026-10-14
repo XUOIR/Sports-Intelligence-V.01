@@ -25,7 +25,8 @@ class Limits:
 
     async def reserve(self, provider: str, cost: int = 1, *, identity=None, usd=Decimal(0), fixture_id=None, cycle_id=None):
         caps={'odds':settings.odds_daily_credits,'pandascore':settings.pandascore_daily_requests,
-            'openrouter':settings.llm_daily_requests,'nhl':settings.nhl_daily_requests,'odds_meta':24,
+            'openrouter':settings.llm_daily_requests,'nhl':settings.nhl_daily_requests,
+            'nhl_scores':settings.nhl_score_daily_requests,'odds_meta':24,
             'openrouter_meta':max(24,settings.llm_daily_requests+6),'openrouter_wallet':4,'pandascore_meta':4}
         if provider not in caps or type(cost) is not int or not 1<=cost<=1000:
             raise BudgetExceeded('Invalid provider or request cost')

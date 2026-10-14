@@ -34,6 +34,7 @@ from app.operations import operational_status
 from app.limits import limits,BudgetExceeded
 from app.allowances import provider_allowances
 from app import manual_odds
+from app import matches
 from app.http import ProviderError
 
 @asynccontextmanager
@@ -144,6 +145,24 @@ async def dashboard(session=Depends(database)):
 @app.get('/operations',dependencies=[Depends(authorize)])
 async def operations(session=Depends(database)):
     return await operational_status(session)
+
+@app.get('/matches',dependencies=[Depends(authorize)])
+async def match_feed(date:str|None=None,session=Depends(database)):
+    try:day=matches.selected_date(date)
+    except ValueError as exc:raise HTTPException(422,str(exc)) from None
+    return await matches.feed(session,day)
+
+class MatchDateInput(BaseModel):
+    model_config=ConfigDict(extra='forbid')
+    date:str=Field(min_length=10,max_length=10)
+
+@app.post('/matches/sync',dependencies=[Depends(authorize)])
+async def request_match_day(body:MatchDateInput):
+    try:day=matches.selected_date(body.date)
+    except ValueError as exc:raise HTTPException(422,str(exc)) from None
+    if db.Session is None:raise HTTPException(503,'Database is not configured')
+    await matches.enqueue(day)
+    return {'date':str(day),'status':'queued','paid_credits':0}
 
 @app.post('/operations/allowances',dependencies=[Depends(authorize)])
 async def allowances():

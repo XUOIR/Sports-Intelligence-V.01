@@ -18,6 +18,7 @@ async def operational_status(session):
     limits={r.key:r for r in rows}
     def used(key):return limits[key].used if key in limits else 0
     paused=bool(used('control:paid'))
+    score_budget=await session.get(RuntimeLimit,f'nhl_scores:{at.date()}')
     providers=[]
     for provider,enabled,cap in [('odds',bool(settings.odds_key and settings.odds_daily_credits),settings.odds_daily_credits),
         ('openrouter',settings.llm_enabled,settings.llm_daily_requests),
@@ -54,6 +55,7 @@ async def operational_status(session):
     factors=sum(set(f.metrics.get('factors',{}))==set(NHL_WEIGHTS) for f in future)
     usable=sum(s.baseline_home_probability is not None for s in snapshots)
     return {'active_sports':list(settings.active_sports),'paid_paused':paused,'providers':providers,
+        'nhl_scores':{'daily_used':score_budget.used if score_budget else 0,'daily_cap':settings.nhl_score_daily_requests,'paid_credits':0},
         'odds_monthly_used':used(f'odds-month:{at:%Y-%m}'),'odds_monthly_cap':settings.odds_monthly_credits,
         'ai_daily_reserved_usd':str(Decimal(used(f'openrouter-usd:{at.date()}'))/1_000_000),'ai_daily_cap_usd':str(settings.llm_daily_usd),
         'ai_monthly_reserved_usd':str(Decimal(used(f'openrouter-usd-month:{at:%Y-%m}'))/1_000_000),'ai_monthly_cap_usd':str(settings.llm_monthly_usd),
