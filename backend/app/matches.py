@@ -78,10 +78,10 @@ def interval(games,day):
            abs((aware(g['commence_time'])-now()).total_seconds())<3600 for g in games):return 60
     return 300 if any(g['game_state'] not in FINAL for g in games) else 900
 
-def due(cached):
+def due(next_at):
     # The scheduler is on a fixed cadence. Allow a small timer/DB jitter window,
     # while the durable leases prevent concurrent repeats across instances.
-    return not cached or aware(cached.info['next_at'])<=now()+timedelta(seconds=2)
+    return not next_at or aware(next_at)<=now()+timedelta(seconds=2)
 
 async def enqueue(day):
     async with db.Session.begin() as session:
@@ -93,8 +93,9 @@ async def enqueue(day):
 
 async def refresh_day(day):
     async with db.Session() as session:
-        cached=await session.get(ProviderState,f'nhl-score:{day}')
-        if not due(cached):return
+        next_at=await session.scalar(select(ProviderState.info['next_at'].as_string())
+            .where(ProviderState.provider==f'nhl-score:{day}'))
+        if not due(next_at):return
     if not await limits.lease(f'nhl-score:{day}',25):return
     try:
         started=now()
@@ -116,8 +117,10 @@ async def tick():
         pending=(await session.scalars(select(ProviderState).where(ProviderState.provider.like('nhl-request:%'))
             .where(ProviderState.observed_at>now()-timedelta(minutes=20)).order_by(ProviderState.observed_at).limit(15))).all()
         previous=await session.get(ProviderState,f'nhl-score:{today-timedelta(days=1)}')
-        caches=(await session.scalars(select(ProviderState).where(ProviderState.provider.like('nhl-score:%')))).all()
-        next_at={row.provider:aware(row.info['next_at']) for row in caches}
+        # Read deadlines only, not every cached game's payload on every tick.
+        caches=(await session.execute(select(ProviderState.provider,ProviderState.info['next_at'].as_string())
+            .where(ProviderState.provider.like('nhl-score:%')))).all()
+        next_at={provider:aware(deadline) for provider,deadline in caches if deadline}
     # Today's feed always runs; yesterday continues if a game crosses midnight.
     days=[today]
     if previous and any(g['game_state'] in LIVE for g in previous.info['games']):days.append(today-timedelta(days=1))
