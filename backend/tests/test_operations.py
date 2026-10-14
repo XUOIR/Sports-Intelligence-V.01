@@ -75,19 +75,26 @@ def test_corrupt_or_incompatible_model_approval_is_rejected():
     assert not validated_model(model)
 
 async def test_account_check_is_cached_and_never_uses_paid_endpoints(database,monkeypatch):
-    monkeypatch.setattr(allowances,'settings',replace(settings,odds_key='test-only',router_key='test-only',esports_key='test-only'))
+    monkeypatch.setattr(allowances,'settings',replace(settings,active_sports=('NHL','CS2'),odds_key='test-only',router_key='test-only',esports_key='test-only'))
+    # Test allowance orchestration independently of SQLite's one shared in-memory
+    # connection, which cannot isolate the three concurrent metadata transactions.
+    observed={}
+    async def read(provider,**kwargs):return observed.get(provider)
+    async def remember(provider,info):observed[provider]=info
+    monkeypatch.setattr(allowances,'limits',SimpleNamespace(observation=read,observe=remember))
     calls=[]
     async def metadata(provider,method,url,**kwargs):
         calls.append(provider);assert method=='GET' and provider not in {'odds','openrouter','pandascore'}
-        if provider=='odds_meta':await Limits().observe('odds',{'used':123,'remaining':19877,'last':0});return []
-        if provider=='openrouter_meta':return {'data':{'limit':10,'limit_remaining':9,'limit_reset':'monthly','usage':1,'usage_monthly':1}}
+        if provider=='odds_meta':await remember('odds',{'used':123,'remaining':19877,'last':0});return []
+        if provider=='openrouter_meta':return {'data':{'limit':10,'limit_remaining':9,'limit_reset':'monthly','usage':1,'usage_daily':'.0042','usage_monthly':1}}
         if provider=='openrouter_wallet':return {'data':{'total_credits':20,'total_usage':1}}
         assert url.endswith('/csgo/matches/upcoming') and kwargs['params']['page[size]']==1
-        await Limits().observe('pandascore',{'hourly_limit':1000,'hourly_remaining':999});return []
+        await remember('pandascore',{'hourly_limit':1000,'hourly_remaining':999});return []
     monkeypatch.setattr(allowances.http,'request',metadata)
     first=await allowances.provider_allowances();second=await allowances.provider_allowances()
     assert first==second and len(calls)==4
     assert first[0]['period_allowance']==20000 and first[1]['wallet_remaining_usd']=='19'
+    assert first[1]['key_daily_used_usd']=='.0042' or first[1]['key_daily_used_usd']=='0.0042'
     assert first[2]['hourly_limit']==1000
     async with database() as session:assert await session.scalar(select(func.count()).select_from(ProviderCall))==0
 

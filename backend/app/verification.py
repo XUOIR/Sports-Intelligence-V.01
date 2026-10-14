@@ -17,12 +17,15 @@ def current_timestamp(value, at, lifetime):
 
 
 def price_pair(quotes, fixture, at):
-    pairs = {}
+    pairs,latest = {},{}
     for quote in quotes:
         if (quote.bookmaker in {'playnow', 'bclc'} and quote.market == 'h2h' and quote.line is None
-                and quote.selection in {fixture.home, fixture.away} and quote.decimal_odds > 1
-                and aware(quote.source_at) <= at):
-            pairs.setdefault((quote.bookmaker, aware(quote.source_at)), {})[quote.selection] = quote
+                and quote.selection in {fixture.home, fixture.away} and quote.decimal_odds > 1):
+            key=(quote.bookmaker,quote.selection)
+            if key not in latest or aware(quote.source_at)>aware(latest[key].source_at):latest[key]=quote
+    for quote in latest.values():
+        if aware(quote.source_at)<=at:
+            pairs.setdefault((quote.bookmaker,aware(quote.source_at)),{})[quote.selection]=quote
     complete = [(stamp, prices) for (_, stamp), prices in pairs.items() if len(prices) == 2]
     return max(complete, key=lambda row: row[0], default=None)
 

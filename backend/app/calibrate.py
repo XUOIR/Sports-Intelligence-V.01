@@ -3,9 +3,10 @@ import argparse
 import asyncio
 import json
 import hashlib
+from datetime import timedelta
 from pathlib import Path
 from . import db
-from .clock import aware
+from .clock import aware,now
 from .models import ModelValidation
 from .model_config import MODEL_VERSION,baseline_digest
 from .maths import calibrated, decimal
@@ -34,6 +35,23 @@ def validate(records):
         standings=r['sources']['standings']['payload']
         if r['sport']=='NHL' and r['sources']['history']['payload'].get('contract')!=HISTORY_CONTRACT:
             raise ValueError('Legacy NHL history cannot validate the current regular-season model')
+        if r['sport']=='NHL':
+            factor_source=r.get('factor_source')
+            try:
+                anchor=aware(r['anchor_at'])
+                if (not factor_source or factor_source['payload']!=r['factors']
+                    or not anchor-timedelta(minutes=30)<=aware(factor_source['source_at'])<=aware(factor_source['observed_at'])<=anchor):
+                    raise ValueError()
+            except (KeyError,TypeError,ValueError):
+                raise ValueError('NHL factors require genuine pre-anchor source provenance') from None
+            try:
+                result=r['result_source']
+                h,a=result['home_score'],result['away_score']
+                if (result['game_id']!=r['fixture_id'] or type(h) is not int or type(a) is not int
+                        or not 0<=h<=100 or not 0<=a<=100 or h==a or int(h>a)!=r['outcome']
+                        or not aware(r['commence_time'])<=aware(result['observed_at'])<=now()):raise ValueError()
+            except (KeyError,TypeError,ValueError):
+                raise ValueError('NHL outcomes require a matching observed final score') from None
         recomputed=frozen_vector(standings['home'],standings['away'],r['sources']['history']['payload'],r['commence_time'])
         if recomputed!=r['vector'] or baseline(r['sport'],r['factors'])!=decimal(r['probability']):
             raise ValueError('Frozen vector/probability does not match its source evidence')

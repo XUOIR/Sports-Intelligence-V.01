@@ -37,6 +37,12 @@ async def daily_nhl():
     await ingest_nhl(history=True)
     await anchors()
 
+async def recover_startup():
+    # Existing fixtures must retain their exact checkpoint even if refresh is
+    # unavailable or the free-data budget is exhausted during this restart.
+    await anchors()
+    await daily_nhl()
+
 async def prepare_anchors():
     async with db.Session() as session:
         upcoming=(await session.execute(select(Fixture.id,Fixture.commence_time).where(Fixture.sport=='NHL',
@@ -95,4 +101,4 @@ def start():
     scheduler.add_job(guarded, "interval", days=1, args=["retention",retain], id="retention")
     scheduler.start()
     # Bounded startup recovery; no catch-up of missed paid cron runs.
-    scheduler.add_job(guarded, "date", args=["startup",daily_nhl,1800], run_date=now()+timedelta(seconds=2), id="startup")
+    scheduler.add_job(guarded, "date", args=["startup",recover_startup,1800], run_date=now()+timedelta(seconds=2), id="startup")

@@ -1,13 +1,35 @@
 """Private operational status. Reading this module never contacts a provider."""
-from datetime import timedelta
+from datetime import timedelta,timezone
 from decimal import Decimal
 from sqlalchemy import select,func
 from .clock import now,aware
 from .config import settings
-from .models import RuntimeLimit,ProviderCall,ProviderState,Fixture,Snapshot,ModelValidation,MarketOdds
+from .models import RuntimeLimit,ProviderCall,ProviderState,Fixture,Snapshot,ModelValidation
 from .readiness import validated_model
 from .model_config import NHL_WEIGHTS
 from .limits import limits as guard
+from .verification import price_pair
+from .market_display import latest_quotes
+
+async def reported_ai_usage(session, at):
+    row=await session.get(ProviderState,'allowance:openrouter')
+    result={'status':'not_checked','checked_at':None,'daily_usd':None,'monthly_usd':None,'period_timezone':'UTC'}
+    if row is None:return result
+    info=row.info
+    result['checked_at']=aware(row.observed_at).isoformat()
+    if info.get('status')!='verified':return {**result,'status':'unavailable'}
+    if not timedelta(0)<=at-aware(row.observed_at)<=timedelta(hours=1):return {**result,'status':'stale'}
+    # A cached total from yesterday must not be labeled as today's spending.
+    checked=aware(row.observed_at).astimezone(timezone.utc)
+    current=at.astimezone(timezone.utc)
+    for key,field,same_period in [('daily_usd','key_daily_used_usd',checked.date()==current.date()),
+        ('monthly_usd','key_monthly_used_usd',(checked.year,checked.month)==(current.year,current.month))]:
+        try:
+            value=Decimal(info[field])
+            if same_period and value.is_finite() and value>=0:result[key]=str(value)
+        except (KeyError,TypeError,ArithmeticError):pass
+    result['status']='verified' if result['daily_usd'] is not None and result['monthly_usd'] is not None else 'partial'
+    return result
 
 async def operational_status(session):
     at=now()
@@ -41,15 +63,14 @@ async def operational_status(session):
     model=await session.scalar(select(ModelValidation).where(ModelValidation.sport=='NHL',ModelValidation.approved.is_(True)).order_by(ModelValidation.created_at.desc()).limit(1))
     mature=await session.scalar(select(func.count()).select_from(Snapshot).join(Fixture).where(Fixture.sport=='NHL',
         Snapshot.final_home_win.is_not(None),Snapshot.baseline_home_probability.is_not(None)))
-    fresh_quotes=(await session.scalars(select(MarketOdds).where(MarketOdds.fixture_id.in_(ids),MarketOdds.bookmaker.in_(['playnow','bclc']),
-        MarketOdds.market=='h2h',MarketOdds.source_at>=at-timedelta(minutes=5),MarketOdds.source_at<=at))).all() if ids else []
-    pairs={(q.fixture_id,q.bookmaker,q.selection) for q in fresh_quotes}
+    saved_quotes=await latest_quotes(session,ids)
     prices=0
     for fixture in future:
         try:
+            pair=price_pair(saved_quotes.get(fixture.id,[]),fixture,at)
             if (fixture.metrics.get('execution_source_present') is True
                 and timedelta(0)<=at-aware(fixture.metrics['execution_verified_at'])<=timedelta(minutes=5)
-                and any((fixture.id,book,fixture.home) in pairs and (fixture.id,book,fixture.away) in pairs for book in ('playnow','bclc'))):prices+=1
+                and pair and timedelta(0)<=at-pair[0]<=timedelta(minutes=5)):prices+=1
         except (KeyError,TypeError,ValueError):pass
     personnel=0
     for fixture in future:
@@ -69,6 +90,7 @@ async def operational_status(session):
         'ai_daily_reserved_usd':str(Decimal(used(f'openrouter-usd:{at.date()}'))/1_000_000),'ai_daily_cap_usd':str(settings.llm_daily_usd),
         'ai_monthly_reserved_usd':str(Decimal(used(f'openrouter-usd-month:{at:%Y-%m}'))/1_000_000),'ai_monthly_cap_usd':str(settings.llm_monthly_usd),
         'ai_request_reservation_usd':str(settings.llm_request_usd),
+        'ai_actual_usage':await reported_ai_usage(session,at),
         'nhl':{'upcoming':len(future),'fresh_price_pairs':prices,'confirmed_personnel':personnel,'advanced_factors':factors,
             'frozen_inputs':len(snapshots),'usable_frozen_inputs':usable,'labeled_training_records':int(mature or 0),
             'model_approved':validated_model(model),'required_partitions':[300,100,100]},

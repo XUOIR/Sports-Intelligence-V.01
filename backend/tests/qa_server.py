@@ -6,6 +6,9 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 for key in ("SUPABASE_DB_URL","THE_ODDS_API_KEY","ESPORTS_API_KEY","OPENROUTER_API_KEY"):
     os.environ[key] = ""
 os.environ["ENABLE_SCHEDULER"] = "false"
+if os.getenv('QA_SPENDING')=='true':
+    os.environ['LLM_DAILY_USD']='.30'
+    os.environ['LLM_MONTHLY_USD']='3'
 if os.getenv('QA_NHL_STATISTICS')=='true':
     os.environ['ENABLE_NHL_ADVANCED_STATS']='true'
 
@@ -50,6 +53,10 @@ async def lifespan(application):
     db.Session=async_sessionmaker(engine,expire_on_commit=False)
     async with db.Session.begin() as session:
         session.add(Account(id=1,initial_bankroll=1100))
+        if os.getenv('QA_SPENDING')=='true':
+            session.add(ProviderState(provider='allowance:openrouter',observed_at=now(),info={
+                'status':'verified','metadata_version':2,'checked_at':now().isoformat(),
+                'key_daily_used_usd':'0','key_monthly_used_usd':'0'}))
         if os.getenv('QA_NHL_STATISTICS')=='true':
             # Actual tested data, an explicitly illustrative matchup and a local
             # disposable database. No real fixture or live source is fabricated.

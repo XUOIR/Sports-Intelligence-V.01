@@ -19,7 +19,8 @@ async def main():
         records=[{'fixture_id':s.fixture_id,'sport':f.sport,'commence_time':aware(f.commence_time).isoformat(),
             'anchor_at':aware(s.anchor_at).isoformat(),'collected_at':aware(s.collected_at).isoformat(),
             'vector':s.vector,'model_version':s.model_version,'probability':str(s.baseline_home_probability),
-            'outcome':int(s.final_home_win),'sources':s.context.get('sources',{}),'factors':s.context.get('factors',{})} for s,f in rows]
+            'outcome':int(s.final_home_win),'sources':s.context.get('sources',{}),'factors':s.context.get('factors',{}),
+            'factor_source':s.context.get('factor_source'),'result_source':s.context.get('result_source')} for s,f in rows]
     args.output.write_text(json.dumps(records,separators=(',',':')),encoding='utf-8')
     await db.engine.dispose()
     print(f'Exported {len(records)} outcome-labeled snapshots')

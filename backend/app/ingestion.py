@@ -3,16 +3,17 @@ import logging
 import re
 import unicodedata
 from datetime import timedelta
-from sqlalchemy import select
+from sqlalchemy import select,or_,and_
 from . import db, providers
 from .clock import now, aware
-from .models import Fixture, Evidence, MarketOdds, State, Snapshot, AuditLog
+from .models import Fixture, Evidence, MarketOdds, State, Snapshot, AuditLog, ProviderState
 from .maths import implied, parse_odds, decimal
 from .model_config import SHARP_MOVEMENT
 from .features import eligible_history
 from .nhl_history import completed_games, HISTORY_CONTRACT
 from .config import settings
-from .limits import limits
+from .limits import limits,BudgetExceeded
+from .http import ProviderError
 
 log = logging.getLogger("ingestion")
 
@@ -283,25 +284,73 @@ async def ingest_odds(*,refresh_id=None,report=None):
     if report is not None:report.update(counts)
     return reevaluate
 
+def final_scores(home,away):
+    if (type(home) is not int or type(away) is not int or not 0<=home<=100
+            or not 0<=away<=100 or home==away):
+        raise ValueError('An explicit non-tied final score is required')
+    return home>away
+
+
+def cached_result(cache,fixture):
+    if cache is None or not aware(fixture.commence_time)<=aware(cache.observed_at)<=now():return None
+    games=cache.info.get('games') if isinstance(cache.info,dict) else None
+    if not isinstance(games,list) or len(games)>50:return None
+    for game in games:
+        if not isinstance(game,dict):continue
+        if game.get('id')!=fixture.id or game.get('game_state') not in {'OFF','FINAL'}:continue
+        try:
+            if (normalized(game['home'])!=normalized(fixture.home) or normalized(game['away'])!=normalized(fixture.away)
+                    or aware(game['commence_time'])!=aware(fixture.commence_time)):continue
+            winner=final_scores(game.get('home_score'),game.get('away_score'))
+            return winner,{'source':'NHL public API score cache','observed_at':aware(cache.observed_at).isoformat(),
+                           'home_score':game['home_score'],'away_score':game['away_score'],'game_id':fixture.id}
+        except (KeyError,TypeError,ValueError):continue
+    return None
+
+
 async def ingest_results():
+    counts={'resolved':0,'labeled':0,'from_cache':0,'requests':0}
     async with db.Session() as session:
-        fixtures = (await session.scalars(select(Fixture).where(Fixture.id.like("nhl:%"), Fixture.commence_time < now(),
-            Fixture.commence_time > now()-timedelta(days=3), Fixture.final_home_win.is_(None)).limit(12))).all()
+        fixtures = (await session.scalars(select(Fixture).outerjoin(Snapshot,Snapshot.fixture_id==Fixture.id).where(
+            Fixture.id.like("nhl:%"),Fixture.commence_time<now(),Fixture.commence_time>now()-timedelta(days=3),
+            or_(Fixture.final_home_win.is_(None),and_(Snapshot.fixture_id.is_not(None),Snapshot.final_home_win.is_(None))))
+            .order_by(Snapshot.fixture_id.is_(None),Fixture.commence_time).limit(12))).all()
+        caches={}
         for fixture in fixtures:
-            payload = await providers.nhl_game(fixture.id.split(":",1)[1])
-            if payload.get("gameState") not in {"OFF","FINAL"}:
-                continue
             try:
-                h, a = payload["homeTeam"]["score"], payload["awayTeam"]["score"]
-                if h == a:
-                    continue
-                fixture.final_home_win = h > a
+                if fixture.final_home_win is not None:
+                    winner,source=fixture.final_home_win,{'source':'Previously recorded fixture outcome','recovered_at':now().isoformat()}
+                else:
+                    day=aware(fixture.commence_time).date()
+                    if day not in caches:caches[day]=await session.get(ProviderState,f'nhl-score:{day}')
+                    result=cached_result(caches[day],fixture)
+                    if result:
+                        winner,source=result;counts['from_cache']+=1
+                    else:
+                        counts['requests']+=1
+                        payload=await providers.nhl_game(fixture.id.split(':',1)[1])
+                        if payload.get('gameState') not in {'OFF','FINAL'}:continue
+                        if str(payload.get('id'))!=fixture.id.split(':',1)[1]:raise ValueError('Result event identity changed')
+                        if aware(payload['startTimeUTC'])!=aware(fixture.commence_time) or aware(payload['startTimeUTC'])>now():raise ValueError('Result start changed')
+                        for side in ('home','away'):
+                            expected=fixture.metrics.get(f'{side}_abbrev')
+                            if expected and payload[f'{side}Team'].get('abbrev')!=expected:raise ValueError('Result team changed')
+                        h,a=payload['homeTeam']['score'],payload['awayTeam']['score']
+                        winner=final_scores(h,a)
+                        source={'source':'NHL public API gamecenter','observed_at':now().isoformat(),
+                            'url':f'https://api-web.nhle.com/v1/gamecenter/{payload["id"]}/landing','home_score':h,'away_score':a,'game_id':fixture.id}
+                    fixture.final_home_win=winner;counts['resolved']+=1
                 snapshot = await session.get(Snapshot, fixture.id)
-                if snapshot and snapshot.baseline_home_probability is not None:
-                    snapshot.final_home_win = fixture.final_home_win
+                if snapshot:
+                    snapshot.final_home_win=winner
+                    snapshot.context={**snapshot.context,'result_source':source}
                     predicted = snapshot.prediction_home_probability if snapshot.prediction_home_probability is not None else snapshot.baseline_home_probability
-                    snapshot.brier = (predicted-decimal(int(h>a)))**2
-            except (KeyError, TypeError):
+                    snapshot.brier = (predicted-decimal(int(winner)))**2 if predicted is not None else None
+                    counts['labeled']+=1
+            except BudgetExceeded:
+                # Keep already reconciled outcomes when the free API is capped.
+                break
+            except (KeyError,TypeError,ValueError,ProviderError):
                 log.warning("NHL result payload changed for %s", fixture.id)
         await session.commit()
     for sport in providers.ESPORTS:
@@ -327,3 +376,4 @@ async def ingest_results():
                     snapshot.final_home_win=winner==home_id
                     p=snapshot.prediction_home_probability if snapshot.prediction_home_probability is not None else snapshot.baseline_home_probability
                     snapshot.brier=(p-decimal(int(winner==home_id)))**2
+    return counts

@@ -6,7 +6,7 @@ from sqlalchemy import select, func
 from sqlalchemy.dialects.postgresql import insert
 from . import db
 from .clock import aware, now
-from .models import Fixture, Evidence, Snapshot, State, MarketOdds, PersonalBet, Outcome, Account, EvaluationCycle, ModelValidation
+from .models import Fixture, Evidence, Snapshot, State, PersonalBet, Outcome, Account, EvaluationCycle, ModelValidation
 from .features import frozen_vector, validate_source
 from .maths import baseline, decimal, calibrated, stake
 from .model_config import MODEL_VERSION, MIN_EDGE, GATE_NAMES, MAX_OPEN_EXPOSURE, baseline_digest
@@ -17,6 +17,8 @@ from .config import settings
 from .readiness import validated_model
 from .nhl_advanced import frozen_context
 from .nhl_history import HISTORY_CONTRACT
+from .verification import price_pair, current_timestamp
+from .market_display import latest_quotes
 
 async def freeze(fixture_id: str):
     async with db.Session.begin() as session:
@@ -64,13 +66,16 @@ async def freeze(fixture_id: str):
             p = None
             fixture.state, fixture.reason = State.HOLD, f"Advanced factors missing: {str(exc)[:200]}"
         advanced_context=await frozen_context(session,fixture,anchor)
-        if now()>anchor+timedelta(seconds=5):
+        collected=now()
+        if collected>anchor+timedelta(seconds=5):
             fixture.state,fixture.reason=State.HOLD,"Anchor processing deadline exceeded; no late snapshot"
             return
-        session.add(Snapshot(fixture_id=fixture_id, anchor_at=anchor, game_date=aware(fixture.commence_time).date(), vector=vector,
-            evidence_ids=[r.id for r in selected.values()], baseline_home_probability=p, model_version=MODEL_VERSION,
+        session.add(Snapshot(fixture_id=fixture_id, anchor_at=anchor, collected_at=collected, game_date=aware(fixture.commence_time).date(), vector=vector,
+            evidence_ids=[r.id for r in selected.values()]+([factor_source.id] if factor_source else []), baseline_home_probability=p, model_version=MODEL_VERSION,
             context={"sources": {k:{"source_at":aware(r.source_at).isoformat(),"observed_at":aware(r.observed_at).isoformat(),"payload":r.payload} for k,r in selected.items()},
-                "factors":factor_source.payload if factor_source else {},"nhl_statistics":advanced_context}))
+                "factors":factor_source.payload if factor_source else {},
+                "factor_source":{"source_at":aware(factor_source.source_at).isoformat(),"observed_at":aware(factor_source.observed_at).isoformat(),"payload":factor_source.payload} if factor_source else None,
+                "nhl_statistics":advanced_context}))
         fixture.dirty = True
 
 def recommendation_state(gates: dict, *, has_execution: bool, personnel: bool, edge: Decimal | None, frozen: bool):
@@ -99,20 +104,16 @@ async def evaluate(fixture_id: str):
             return
         metrics = fixture.metrics
         confirmed_at = metrics.get("confirmed_at")
-        personnel = metrics.get("personnel_confirmed") is True and bool(confirmed_at) and timedelta(0) <= now()-aware(confirmed_at) <= timedelta(minutes=30)
+        personnel = metrics.get("personnel_confirmed") is True and current_timestamp(confirmed_at,now(),timedelta(minutes=30))
         if fixture.sport in {"CS2","VAL","LOL"}:
             personnel = personnel and metrics.get("roster_complete") is True
-        quotes = (await session.scalars(select(MarketOdds).where(MarketOdds.fixture_id == fixture_id,
-            MarketOdds.market == "h2h", MarketOdds.bookmaker.in_(["playnow","bclc"]),
-            MarketOdds.source_at >= now()-timedelta(minutes=5), MarketOdds.source_at <= now()).order_by(MarketOdds.source_at.desc()).limit(20))).all()
-        latest = {}
-        for q in quotes:
-            latest.setdefault((q.bookmaker,q.selection), q)
-        # Require a complete binary market; three-way / single-side quotes cannot masquerade as executable prices.
-        complete = [q for q in latest.values() if q.selection in {fixture.home,fixture.away} and
-            (q.bookmaker, fixture.away if q.selection == fixture.home else fixture.home) in latest]
+        quotes=(await latest_quotes(session,[fixture_id])).get(fixture_id,[])
+        # Use the same two-side / book / timestamp contract as the UI gate.
+        # A partial newer response cannot be combined with an older opposite side.
+        pair=price_pair(quotes,fixture,now())
+        complete=list(pair[1].values()) if pair and timedelta(0)<=now()-pair[0]<=timedelta(minutes=5) else []
         execution_checked=metrics.get("execution_verified_at")
-        if metrics.get("execution_source_present") is not True or not execution_checked or not timedelta(0)<=now()-aware(execution_checked)<=timedelta(minutes=5):
+        if metrics.get("execution_source_present") is not True or not current_timestamp(execution_checked,now(),timedelta(minutes=5)):
             complete=[]
         model = await session.scalar(select(ModelValidation).where(ModelValidation.sport == fixture.sport,
             ModelValidation.approved.is_(True)).order_by(ModelValidation.created_at.desc()).limit(1))
@@ -145,7 +146,10 @@ async def evaluate(fixture_id: str):
             fixture.selection, fixture.probability, fixture.edge = quote.selection, p, edge
             fixture.target_price = 1/(p-MIN_EDGE) if p > MIN_EDGE else None
         else:
-            fixture.selection, fixture.probability, fixture.edge, fixture.target_price = None, None, None, None
+            # A genuine calibrated forecast does not disappear when prices expire.
+            # Without prices it has no betting edge, target price or suggested stake.
+            fixture.selection, fixture.probability = (fixture.home,p_home) if p_home is not None else (None,None)
+            fixture.edge, fixture.target_price = None, None
         # AI can veto factual gates, never supply them. No paid call until every deterministic gate passes.
         revision = fixture.revision
         cycle_id = hashlib.sha256(json.dumps([fixture_id,snapshot.anchor_at.isoformat(),model.version if model else None,
@@ -179,7 +183,7 @@ async def evaluate(fixture_id: str):
                 return
         if chosen and now()-aware(chosen[0].source_at)>timedelta(minutes=5):
             gates["price"]=False
-        if confirmed_at and now()-aware(confirmed_at)>timedelta(minutes=30):
+        if not current_timestamp(confirmed_at,now(),timedelta(minutes=30)):
             gates["personnel"]=False
             personnel=False
         fixture.gates = gates

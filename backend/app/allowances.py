@@ -1,6 +1,7 @@
 """Explicit, bounded account checks. No generations or paid odds are requested."""
 import asyncio
-from .clock import now
+from datetime import timezone
+from .clock import now,aware
 from .config import settings
 from .limits import limits
 from .http import http
@@ -9,7 +10,11 @@ from .maths import decimal
 async def provider_allowances():
     async def check(provider):
         cached=await limits.observation(f'allowance:{provider}',max_age=3600)
-        if cached:return cached
+        if cached:
+            if provider!='openrouter':return cached
+            try:
+                if cached.get('metadata_version')==2 and aware(cached['checked_at']).astimezone(timezone.utc).date()==now().astimezone(timezone.utc).date():return cached
+            except (KeyError,TypeError,ValueError):pass
         result={'provider':provider,'checked_at':now().isoformat(),'status':'unavailable'}
         try:
             if provider=='odds':
@@ -21,16 +26,24 @@ async def provider_allowances():
             elif provider=='openrouter':
                 if not settings.router_key:return {**result,'reason':'Credential not configured'}
                 key=(await http.request('openrouter_meta','GET','https://openrouter.ai/api/v1/key',headers={'Authorization':f'Bearer {settings.router_key}'}))['data']
-                result.update(status='verified',unit='USD pay as you go',key_limit_usd=None if key.get('limit') is None else str(decimal(key['limit'])),
+                result.update(status='verified',metadata_version=2,unit='USD pay as you go',key_limit_usd=None if key.get('limit') is None else str(decimal(key['limit'])),
                     key_remaining_usd=None if key.get('limit_remaining') is None else str(decimal(key['limit_remaining'])),
-                    key_reset=key.get('limit_reset'),key_used_usd=str(decimal(key.get('usage',0))),
-                    key_monthly_used_usd=str(decimal(key.get('usage_monthly',0))))
+                    key_reset=key.get('limit_reset'))
+                # Missing usage is unknown, never an invented zero. Provider
+                # daily/monthly counters use UTC, unlike the app's Pacific caps.
+                for field, source in [('key_used_usd','usage'),('key_daily_used_usd','usage_daily'),('key_monthly_used_usd','usage_monthly')]:
+                    if key.get(source) is not None:
+                        value=decimal(key[source])
+                        if value<0:raise ValueError('Invalid provider usage')
+                        result[field]=str(value)
                 try:
                     wallet=(await http.request('openrouter_wallet','GET','https://openrouter.ai/api/v1/credits',headers={'Authorization':f'Bearer {settings.router_key}'}))['data']
                     result['wallet_remaining_usd']=str(decimal(wallet['total_credits'])-decimal(wallet['total_usage']))
                 except Exception as exc:
                     result['wallet_status']=f'Unavailable through this key ({type(exc).__name__})'
             elif provider=='pandascore':
+                if not set(settings.active_sports)&{'CS2','VAL','LOL'}:
+                    return {**result,'status':'disabled','reason':'Esports checks are disabled during the NHL phase'}
                 if not settings.esports_key:return {**result,'reason':'Credential not configured'}
                 # One fixture is sufficient to read quota headers. The full
                 # videogame catalogue embeds large histories we do not need.
@@ -40,6 +53,7 @@ async def provider_allowances():
                 result.update(status='verified' if quota.get('hourly_limit') is not None else 'partial',unit='requests per hour',**quota,
                     note='PandaScore uses plan-based hourly limits, not a monthly credit wallet. Exact plan pricing requires the account plan.')
         except Exception as exc:
+            result['status']='unavailable'
             result['reason']=f'Account check could not be completed ({type(exc).__name__})'
         await limits.observe(f'allowance:{provider}',result)
         return result
