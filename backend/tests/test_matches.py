@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import create_async_engine,async_sessionmaker
 from app import db
 from app.models import Base
 import asyncio
+from types import SimpleNamespace
 
 def payload(state='LIVE',gid=2026020102):
     return {'currentDate':str(now().date()),'games':[{'id':gid,'gameDate':str(now().date()),
@@ -41,6 +42,27 @@ def test_date_window_strict():
     assert matches.selected_date(str(now().date()))==now().date()
     for date in ['2026-2-01','2026-02-30','x',str(now().date()+timedelta(days=8))]:
         with pytest.raises(ValueError):matches.selected_date(date)
+
+def test_request_duration_does_not_skip_next_scheduler_tick(monkeypatch):
+    at=now();monkeypatch.setattr(matches,'now',lambda:at)
+    cached=SimpleNamespace(info={'next_at':(at+timedelta(seconds=.5)).isoformat()})
+    assert matches.due(cached)
+    cached.info['next_at']=(at+timedelta(seconds=25)).isoformat()
+    assert not matches.due(cached)
+
+@pytest.mark.asyncio
+async def test_cache_refresh_deadline_is_request_start_not_completion(database,monkeypatch):
+    at=now();monkeypatch.setattr(matches,'now',lambda:at)
+    class SlowResponse:
+        async def request(self,*args,**kwargs):
+            nonlocal at
+            at+=timedelta(seconds=5)
+            return payload()
+    monkeypatch.setattr(matches,'http',SlowResponse())
+    start=at;await matches.refresh_day(at.date())
+    async with database() as session:
+        cached=await session.get(ProviderState,f'nhl-score:{at.date()}')
+        assert matches.aware(cached.info['next_at'])==start+timedelta(seconds=30)
 
 @pytest.mark.asyncio
 async def test_shared_cache_many_readers_cannot_use_paid_credits(database,monkeypatch):

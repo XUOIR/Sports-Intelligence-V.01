@@ -78,6 +78,11 @@ def interval(games,day):
            abs((aware(g['commence_time'])-now()).total_seconds())<3600 for g in games):return 60
     return 300 if any(g['game_state'] not in FINAL for g in games) else 900
 
+def due(cached):
+    # The scheduler is on a fixed cadence. Allow a small timer/DB jitter window,
+    # while the durable 29-second leases prevent fast repeats across instances.
+    return not cached or aware(cached.info['next_at'])<=now()+timedelta(seconds=2)
+
 async def enqueue(day):
     async with db.Session.begin() as session:
         # One date request is shared across visitors. It cannot reset cache TTLs,
@@ -89,13 +94,14 @@ async def enqueue(day):
 async def refresh_day(day):
     async with db.Session() as session:
         cached=await session.get(ProviderState,f'nhl-score:{day}')
-        if cached and aware(cached.info['next_at'])>now():return
-    if not await limits.lease(f'nhl-score:{day}',25):return
+        if not due(cached):return
+    if not await limits.lease(f'nhl-score:{day}',29):return
     try:
+        started=now()
         games=parse_scores(await http.request('nhl_scores','GET',f'https://api-web.nhle.com/v1/score/{day}'),day)
         seconds=interval(games,day)
         await limits.observe(f'nhl-score:{day}',{'games':games,'interval_seconds':seconds,
-            'next_at':(now()+timedelta(seconds=seconds)).isoformat(),'error':None})
+            'next_at':(started+timedelta(seconds=seconds)).isoformat(),'error':None})
     except (ProviderError,BudgetExceeded):
         # Failed fetches keep the original successful observation timestamp.
         # Store the failure separately, including when no good payload exists.
@@ -104,7 +110,7 @@ async def refresh_day(day):
 
 async def tick():
     if 'NHL' not in settings.active_sports or not settings.nhl_score_daily_requests:return
-    if not await limits.lease('nhl-score-tick',25) or await limits.blocked('nhl_scores'):return
+    if not await limits.lease('nhl-score-tick',29) or await limits.blocked('nhl_scores'):return
     today=now().date()
     async with db.Session() as session:
         pending=(await session.scalars(select(ProviderState).where(ProviderState.provider.like('nhl-request:%'))
@@ -118,7 +124,7 @@ async def tick():
     for row in pending:
         try:day=selected_date(row.info['date'])
         except ValueError:continue
-        if day not in days and next_at.get(f'nhl-score:{day}',now())<=now():days.append(day);break
+        if day not in days and next_at.get(f'nhl-score:{day}',now())<=now()+timedelta(seconds=2):days.append(day);break
     for day in days:
         if await limits.blocked('nhl_scores'):break
         await refresh_day(day)
