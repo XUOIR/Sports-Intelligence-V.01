@@ -24,6 +24,8 @@ test('edge is signed probability points, and fair odds use the model probability
   assert.ok(Math.abs(priceComparison(.6,2).edge-.1)<1e-10);
   assert.ok(Math.abs(priceComparison(.4,2).edge+.1)<1e-10);
   assert.equal(priceComparison(.5,2).fair_odds,2);
+  assert.ok(Math.abs(priceComparison(.65,1.8).expected_return-.17)<1e-10);
+  assert.ok(Math.abs(priceComparison(.65,1.8).edge-(.65-1/1.8))<1e-10);
   assert.equal(priceComparison(null,2),null);
   assert.equal(priceComparison(.6,0),null);
 });

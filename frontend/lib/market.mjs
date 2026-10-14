@@ -20,7 +20,7 @@ export function probabilities(fixture){
 }
 export function priceComparison(probability,price){
   if(probability===null||probability===undefined||!Number.isFinite(probability)||probability<0||probability>1||!Number.isFinite(price)||price<=1.0001)return null;
-  return {implied:1/price,edge:probability-1/price,fair_odds:probability>0?1/probability:null};
+  return {implied:1/price,edge:probability-1/price,fair_odds:probability>0?1/probability:null,expected_return:probability*price-1};
 }
 export function noVig(pair){
   if(!pair)return null;
