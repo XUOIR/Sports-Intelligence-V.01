@@ -197,3 +197,77 @@ async def test_pre_anchor_statistics_cannot_be_backdated_or_replaced_in_saved_co
         fixture=await session.get(Fixture,'qa:anchor-stats')
         assert await advanced.frozen_context(session,fixture,anchor) is None
         assert saved['teams']['away']['xg_share']=='.4'
+
+
+async def test_daily_cards_share_saved_stats_without_network_admissions_or_probabilities(database,monkeypatch):
+    import main
+    at = now()
+    monkeypatch.setattr(advanced, 'settings', replace(settings, nhl_advanced_enabled=True))
+    batch = {'schema_version':1, 'model_approved_by_import':False, 'as_of_date':at.date().isoformat(),
+             'verified_through':(at.date()-timedelta(days=1)).isoformat(), 'teams':{
+                 'TOR':{'status':'available','sample_games':6,'latest_game_date':(at.date()-timedelta(days=1)).isoformat(),'xg_share':'.549'},
+                 'EDM':{'status':'available','sample_games':6,'latest_game_date':(at.date()-timedelta(days=1)).isoformat(),'xg_share':'.506'}}}
+    async with database.begin() as session:
+        session.add(ProviderState(provider=advanced.CACHE_KEY,info=batch,observed_at=at-timedelta(hours=1)))
+        for index in range(2):
+            session.add(Fixture(id=f'qa:daily-stats-{index}',sport='NHL',home='Edmonton Oilers',away='Toronto Maple Leafs',
+                commence_time=at+timedelta(hours=2+index),metrics={'home_abbrev':'EDM','away_abbrev':'TOR'}))
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=main.app),base_url='http://test') as client:
+        assert (await client.get('/dashboard')).status_code==401
+        response=await client.get('/dashboard',headers={'Authorization':'Bearer '+settings.admin_token})
+        assert response.status_code==200
+        data=response.json()
+        for fixture in data['fixtures']:
+            assert fixture['probability'] is None and fixture['edge'] is None
+            comparison=data['nhl_team_statistics'][fixture['id']]
+            assert comparison['status']=='available'
+            assert comparison['sides']['away']['metrics']['xg_share']=='.549'
+            assert comparison['sides']['home']['metrics']['xg_share']=='.506'
+    async with database() as session:
+        assert (await session.scalars(select(ProviderCall))).all()==[]
+        assert (await session.scalars(select(RuntimeLimit))).all()==[]
+
+
+@pytest.mark.parametrize('latest,observed_hours,start_hours,expected',[
+    ('previous',-1,2,'available'), ('same_day',-1,2,'not_pre_game'),
+    (None,-1,2,'not_pre_game'), ('bad-date',-1,2,'not_pre_game'),
+    ('2026-02-30',-1,2,'not_pre_game'), ('previous',-1,-2,'not_pre_game'),
+    ('previous',-1,-.75,'not_pre_game')])
+async def test_daily_card_stats_require_known_dates_and_a_genuine_pre_anchor_cache(database,monkeypatch,latest,observed_hours,start_hours,expected):
+    at=now();monkeypatch.setattr(advanced,'now',lambda:at)
+    monkeypatch.setattr(advanced,'settings',replace(settings,nhl_advanced_enabled=True))
+    game_date=(at.date()-timedelta(days=1)).isoformat() if latest=='previous' else at.date().isoformat() if latest=='same_day' else latest
+    batch={'schema_version':1,'model_approved_by_import':False,'as_of_date':at.date().isoformat(),'teams':{
+        'EDM':{'status':'available','sample_games':6,'latest_game_date':game_date,'xg_share':'.6'}}}
+    async with database.begin() as session:
+        session.add(ProviderState(provider=advanced.CACHE_KEY,info=batch,observed_at=at+timedelta(hours=observed_hours)))
+        session.add(Fixture(id='qa:time-stats',sport='NHL',home='Edmonton Oilers',away='Toronto Maple Leafs',
+            commence_time=at+timedelta(hours=start_hours),metrics={'home_abbrev':'EDM','away_abbrev':'TOR'}))
+    async with database() as session:
+        fixture=await session.get(Fixture,'qa:time-stats')
+        result=await advanced.matchup_teams(session,[fixture])
+        assert result[fixture.id]['sides']['home']['metrics']['status']==expected
+        assert result[fixture.id]['sides']['away']['metrics'] is None
+        assert fixture.probability is None and fixture.metrics=={'home_abbrev':'EDM','away_abbrev':'TOR'}
+
+
+async def test_old_card_stats_are_labeled_stale_and_future_cache_is_unavailable(database,monkeypatch):
+    at=now();monkeypatch.setattr(advanced,'now',lambda:at)
+    monkeypatch.setattr(advanced,'settings',replace(settings,nhl_advanced_enabled=True))
+    batch={'schema_version':1,'model_approved_by_import':False,'as_of_date':at.date().isoformat(),'teams':{
+        'EDM':{'status':'available','sample_games':6,'latest_game_date':(at.date()-timedelta(days=1)).isoformat(),'xg_share':'.6'}}}
+    async with database.begin() as session:
+        session.add(ProviderState(provider=advanced.CACHE_KEY,info=batch,observed_at=at-timedelta(hours=30)))
+        session.add(Fixture(id='qa:stale-stats',sport='NHL',home='Edmonton Oilers',away='Toronto Maple Leafs',
+            commence_time=at+timedelta(hours=2),metrics={'home_abbrev':'EDM','away_abbrev':'TOR'}))
+    async with database() as session:
+        fixture=await session.get(Fixture,'qa:stale-stats')
+        result=(await advanced.matchup_teams(session,[fixture]))[fixture.id]
+        assert result['status']=='stale' and result['sides']['home']['metrics']['xg_share']=='.6'
+    async with database.begin() as session:
+        cache=await session.get(ProviderState,advanced.CACHE_KEY)
+        cache.observed_at=at+timedelta(minutes=1)
+    async with database() as session:
+        fixture=await session.get(Fixture,'qa:stale-stats')
+        assert (await advanced.matchup_teams(session,[fixture]))[fixture.id]['status']=='unavailable'
+        assert (await session.scalars(select(ProviderCall))).all()==[]

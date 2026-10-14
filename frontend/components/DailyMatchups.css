@@ -1,0 +1,56 @@
+.daily-matchups{align-items:start;gap:16px}
+.compact-match-card{padding:18px;border-radius:16px}
+.compact-match-card .card-heading .eyebrow{font-size:8px;letter-spacing:1px}
+.compact-match-card .badge{font-size:7px;padding:5px 7px}
+.compact-match-card .match-title h3{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:12px 0;font-size:14px;line-height:1.35;letter-spacing:-.2px}
+.compact-match-card .match-title h3 .match-team{display:flex;align-items:center;gap:9px;color:#edf0f8;font-size:14px;font-weight:500;min-width:0}
+.compact-match-card .match-title h3 .match-team>span:last-child{display:block;color:inherit;font-size:inherit;min-width:0}
+.match-team small{display:block;margin-top:4px;color:#7d8ca8;font-size:8px;font-weight:400;letter-spacing:.7px}
+.compact-match-card .match-title .team-logo{width:40px;height:40px;display:grid;place-items:center;flex-shrink:0}
+.team-logo img{object-fit:contain;width:100%;height:100%;filter:drop-shadow(0 2px 8px #0008)}
+.compact-match-card .match-title .team-logo>span{display:grid;place-items:center;width:100%;height:100%;font-size:10px;color:#9baecf;border:1px solid var(--border);border-radius:9px;background:#14274633}
+.compact-match-card .daily-prices{margin-bottom:8px}
+.compact-match-card .daily-prices>.eyebrow{font-size:8px;letter-spacing:1px}
+.compact-match-card .price-pair{gap:10px}
+.compact-match-card .price-pair>div{padding:8px 12px;border-radius:9px}
+.compact-match-card .price-pair>div>span{min-height:0;font-size:10px;line-height:1.3}
+.compact-match-card .price-pair strong{font-size:23px;line-height:1.2;margin:5px 0}
+.compact-match-card .price-pair small{display:block;font-size:9px;line-height:1.3}
+.daily-xg{margin-top:14px;padding-top:12px;border-top:1px solid var(--border)}
+.daily-stat-heading{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.daily-stat-heading>b{font-size:11px;font-weight:500;color:#b8c4e2}
+.daily-stat-heading>span{font-size:7px;letter-spacing:.4px;color:#7d879e}
+.xg-pair{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:11px}
+.xg-pair>div>div:first-child{display:flex;justify-content:space-between;align-items:center;font-size:10px;color:#8f9dbb;margin-bottom:7px;gap:8px}
+.xg-pair strong{font-size:16px;font-weight:500;color:#bec9f1;font-variant-numeric:tabular-nums}
+.xg-track{height:5px;overflow:hidden;border-radius:10px;background:#252b43}
+.xg-track>span{display:block;height:100%;border-radius:inherit;background:var(--gradient)}
+.xg-track.unknown-range{opacity:.3}
+.xg-pair small{display:block;font-size:8px;color:#7c879c;line-height:1.5;margin-top:7px}
+.xg-difference{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-top:10px;font-size:9px;color:#8b98b2}
+.xg-difference>b{font-weight:500;color:#b1bcec;white-space:nowrap;text-align:right}
+.xg-difference small{display:inline;font-size:8px;color:#7b859d;font-weight:400;margin-left:5px}
+.compact-match-card .match-probability,.compact-match-card .edge-comparisons{margin-top:12px;padding-top:12px}
+.compact-match-card .match-probability b{font-size:11px}
+.compact-match-card .match-probability>div:first-child>span{font-size:6px}
+.compact-match-card .probability-labels{margin:9px 0 8px;gap:10px}
+.compact-match-card .probability-labels>span{font-size:9px;line-height:1.5}
+.compact-match-card .probability-labels strong{font-size:16px}
+.compact-match-card .match-probability .probability-labels strong,.compact-match-card .market-benchmark .probability-labels strong{display:inline-block;margin-left:7px}
+.compact-match-card .edge-comparisons{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.compact-match-card .edge-row+.edge-row{margin-top:0}
+.compact-match-card .edge-row>div{margin-bottom:8px;font-size:10px}
+.compact-match-card .edge-row small{font-size:8px;margin-top:7px}
+.compact-match-card .match-probability input,.compact-match-card .edge-row input{height:5px}
+.compact-match-card .market-benchmark{margin-top:12px;padding-top:10px}
+.compact-match-card .market-benchmark>b{font-size:10px}
+.compact-match-card .market-benchmark .probability-labels{margin-bottom:0}
+.daily-source-notes{border-top:1px solid var(--border);margin-top:12px;padding-top:10px;font-size:9px;color:#909bb2;line-height:1.7}
+.daily-source-notes>summary{cursor:pointer;color:#9eafce;min-height:24px;display:list-item}
+.daily-source-notes p{margin:10px 0;font-size:9px;line-height:1.7;color:#8894ad}
+.daily-source-notes a{color:#a5b8ef}
+.compact-match-card .daily-card-footer{margin-top:10px;gap:10px}
+.compact-match-card .daily-card-footer>span{font-size:9px}
+.compact-match-card .daily-card-footer button{padding:9px;font-size:9px;border-radius:9px}
+@media(min-width:1150px){.daily-matchups{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:700px){.compact-match-card{padding:16px}.compact-match-card .match-title h3{font-size:13px;gap:10px}.compact-match-card .match-title h3 .match-team{font-size:13px;gap:7px}.compact-match-card .match-title .team-logo{width:34px;height:34px}.compact-match-card .match-probability>div:first-child{align-items:center;flex-direction:row}.compact-match-card .daily-card-footer{flex-direction:row;align-items:center}.compact-match-card .daily-card-footer button{width:auto}.compact-match-card .match-probability>div:first-child>span{max-width:120px;text-align:right}}

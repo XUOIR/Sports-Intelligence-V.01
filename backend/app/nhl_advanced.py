@@ -259,6 +259,46 @@ async def detail(session, fixture):
             "note": "Descriptive statistics. Goalies are unconfirmed; these values do not approve a play or change model factors."}
 
 
+async def matchup_teams(session, fixtures):
+    """Read one saved cache for daily cards; never refresh an upstream source."""
+    nhl = [fixture for fixture in fixtures if fixture.sport == 'NHL']
+    if not nhl or not settings.nhl_advanced_enabled:
+        return {}
+    row = await session.get(ProviderState, CACHE_KEY)
+    if row is None:
+        return {f.id: {'status': 'pending', 'source': 'MoneyPuck.com', 'sides': {}} for f in nhl}
+    batch, at = row.info, now()
+    if (batch.get('schema_version') != 1 or batch.get('model_approved_by_import') is not False
+            or aware(row.observed_at) > at):
+        return {f.id: {'status': 'unavailable', 'source': 'MoneyPuck.com', 'sides': {}} for f in nhl}
+    observed = aware(row.observed_at)
+    stale = not timedelta(0) <= at - observed <= timedelta(hours=26) or batch.get('as_of_date') != at.date().isoformat()
+    comparisons = {}
+    for fixture in nhl:
+        start = aware(fixture.commence_time)
+        sides = {}
+        for side in ('home', 'away'):
+            code = fixture.metrics.get(f'{side}_abbrev')
+            metrics = batch.get('teams', {}).get(code)
+            # A current cache cannot masquerade as a historical pregame read.
+            # Same-day completed games also cannot enter that game's context.
+            if metrics:
+                try:
+                    latest = metrics.get('latest_game_date')
+                    eligible = (isinstance(latest, str) and len(latest) == 10
+                                and date.fromisoformat(latest) < start.date()
+                                and observed <= start - timedelta(minutes=30))
+                except (TypeError, ValueError):
+                    eligible = False
+                if not eligible:
+                    metrics = {'status': 'not_pre_game', 'sample_games': 0, 'latest_game_date': None}
+            sides[side] = {'team': getattr(fixture, side), 'abbrev': code, 'metrics': metrics}
+        comparisons[fixture.id] = {'status': 'stale' if stale else 'available', 'source': 'MoneyPuck.com',
+                                  'source_url': 'https://moneypuck.com/data.htm', 'observed_at': observed.isoformat(),
+                                  'as_of_date': batch.get('as_of_date'), 'verified_through': batch.get('verified_through'), 'sides': sides}
+    return comparisons
+
+
 async def frozen_context(session, fixture, anchor):
     """Preserve genuine pre-anchor facts without changing the frozen model vector."""
     if not settings.nhl_advanced_enabled or fixture.sport != 'NHL':

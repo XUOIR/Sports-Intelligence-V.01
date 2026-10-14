@@ -151,6 +151,7 @@ async def dashboard(date:str|None=None,session=Depends(database)):
         "source_updated_at":aware(latest) if latest else None, "server_time":now(), "fixtures":[safe_fixture(f) for f in fixtures],
         "stale":latest is None or now()-aware(latest) > timedelta(minutes=5), "performance":await performance(session),
         "market_odds":{fid:[serialize(q) for q in rows] for fid,rows in quotes.items()},
+        "nhl_team_statistics":await nhl_advanced.matchup_teams(session,fixtures),
         "active_sports":list(settings.active_sports),"operations":await operational_status(session)}
 
 @app.get('/performance',dependencies=[Depends(authorize)])

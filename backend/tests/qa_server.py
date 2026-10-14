@@ -66,6 +66,13 @@ async def lifespan(application):
                 commence_time=now()+timedelta(hours=3),state=State.HOLD,
                 reason='Local statistics test: illustrative matchup, not an official scheduled game.',
                 metrics={'home_abbrev':'EDM','away_abbrev':'TOR'},gates={}))
+            if os.getenv('QA_DAILY_GRID')=='true':
+                # Ten disposable cards test busy-slate density and lazy logos.
+                for index in range(9):
+                    session.add(Fixture(id=f'qa:grid-{index}',sport='NHL',home='Edmonton Oilers',away='Toronto Maple Leafs',
+                        commence_time=now()+timedelta(hours=3,minutes=index+1),state=State.HOLD,
+                        reason='Illustrative local card; no official fixture, price or forecast.',
+                        metrics={'home_abbrev':'EDM','away_abbrev':'TOR'},gates={}))
             if os.getenv('QA_MARKET_DISPLAY')=='true':
                 from app.ingestion import quote_identity
                 await session.flush()
