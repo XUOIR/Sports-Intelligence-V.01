@@ -32,8 +32,10 @@ async def provider_allowances():
                     result['wallet_status']=f'Unavailable through this key ({type(exc).__name__})'
             elif provider=='pandascore':
                 if not settings.esports_key:return {**result,'reason':'Credential not configured'}
-                await http.request('pandascore_meta','GET','https://api.pandascore.co/videogames',
-                    headers={'Authorization':f'Bearer {settings.esports_key}'},params={'page[size]':50})
+                # One fixture is sufficient to read quota headers. The full
+                # videogame catalogue embeds large histories we do not need.
+                await http.request('pandascore_meta','GET','https://api.pandascore.co/csgo/matches/upcoming',
+                    headers={'Authorization':f'Bearer {settings.esports_key}'},params={'page[size]':1})
                 quota=await limits.observation('pandascore') or {}
                 result.update(status='verified' if quota.get('hourly_limit') is not None else 'partial',unit='requests per hour',**quota,
                     note='PandaScore uses plan-based hourly limits, not a monthly credit wallet. Exact plan pricing requires the account plan.')

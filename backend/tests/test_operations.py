@@ -82,6 +82,7 @@ async def test_account_check_is_cached_and_never_uses_paid_endpoints(database,mo
         if provider=='odds_meta':await Limits().observe('odds',{'used':123,'remaining':19877,'last':0});return []
         if provider=='openrouter_meta':return {'data':{'limit':10,'limit_remaining':9,'limit_reset':'monthly','usage':1,'usage_monthly':1}}
         if provider=='openrouter_wallet':return {'data':{'total_credits':20,'total_usage':1}}
+        assert url.endswith('/csgo/matches/upcoming') and kwargs['params']['page[size]']==1
         await Limits().observe('pandascore',{'hourly_limit':1000,'hourly_remaining':999});return []
     monkeypatch.setattr(allowances.http,'request',metadata)
     first=await allowances.provider_allowances();second=await allowances.provider_allowances()
