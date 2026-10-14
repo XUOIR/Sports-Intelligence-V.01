@@ -1,4 +1,4 @@
-# NHL advanced-statistics test and release candidate
+# NHL advanced-statistics test and verified release
 
 Tested October 13–14, 2026 for XUOIR/Sports-Intelligence-V.01. Files came from [MoneyPuck's published downloads](https://moneypuck.com/data.htm), which permit attributed noncommercial use. No new subscription, paid odds refresh or AI generation was used.
 
@@ -34,4 +34,16 @@ The source contract covers the 2026–27 season and requires an update before Ju
 
 Browser QA used real audited statistics in disposable local SQLite, with an explicitly illustrative Toronto/Edmonton matchup. It verified private login, unconfirmed goalies, insufficient samples, Settings isolation, the current theme and a 390-pixel mobile layout without horizontal page overflow. Live keys and real wagers were excluded; temporary servers were stopped.
 
-Raw files, hashes, source observations, audits and SQLite caches stay in ignored `artifacts/nhl-low-cost-provider-research/moneypuck-offline-test/`. Deployment and first live import require independent verification before this candidate is described as live. No predictive model is approved by this release.
+Raw files, hashes, source observations, audits and SQLite caches stay in ignored `artifacts/nhl-low-cost-provider-research/moneypuck-offline-test/`. No predictive model is approved by this release.
+
+## Verified live release — October 14
+
+Both existing Render services are live. The backend deployed feature commit `73d22faee55dec8d27b608ae7d2ec25551e1e71c` in `dep-db7tkm0n74is73e523h0`, triggered by the Blueprint environment update. Logs show the Alembic pre-deploy completed and `/health/ready` returned 200. Independent requests also verified `/health/live` and `/health/ready` returned 200. The frontend deployed `762220c835cab4db141f6504eeb1c8e99cf8cf0f` in `dep-db7tndjl550s73dbtdm0`; Render confirmed Live. That later commit contains documentation and an EOF whitespace change only.
+
+The production sign-in gate was verified using the existing credential. Independent unauthenticated requests to the frontend `/api/data/dashboard` and backend `/operations` both returned 401. The first authenticated Settings import was admitted at **12:50:26 PM Pacific** and succeeded at **12:50:47 PM**. Supabase independently confirmed **32 teams, 64 goalies and 105 games**, statistics date October 14, verified through October 13. Its durable ledger records exactly **one daily attempt** and **33,419,228 accounted bytes** against the 1,500,000,000-byte monthly cap. The initial 45,943,040-byte reservation released only known unused capacity on success. The import button is disabled after the daily attempt.
+
+The actual October 14 Montréal–Washington matchup was opened through the live NHL sidebar. Both teams have six-game samples. Montréal's 5v5 xG share is 54.9% (2.62 xGF/60, 2.15 xGA/60); Washington's is 50.6% (2.98, 2.91). Selecting Jakub Dobes and Logan Thompson showed GSAx −4.022 and +3.452 with three and five appearances, respectively. Both remain explicitly **starter unconfirmed**. The selections did not write personnel evidence or change the WATCH state, unknown probability or zero stake. This validates those two displayed comparisons, not every fixture manually.
+
+Post-release account metadata at **12:51:51 PM Pacific** still showed Odds API 497 remaining/3 used and OpenRouter US$0 use with the US$3 monthly-reset cap intact. The database recorded zero paid calls since the overnight audit interval began, zero bets and zero approved models. No paid fallback, odds refresh or AI generation was requested by the test/import.
+
+The statistics feature is usable in the private dashboard. Verified-pick release remains dependent on genuinely confirmed starters, current matching execution prices, complete source-backed model inputs and successful chronological model validation. The importer and this release do not bypass those requirements. Daily scheduling is configured for 9:00 AM Pacific; the first scheduled run has not yet been observed.

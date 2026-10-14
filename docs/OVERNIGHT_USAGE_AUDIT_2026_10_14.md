@@ -14,3 +14,9 @@ Checked around 11:42 AM Pacific. Active project: XUOIR/Sports-Intelligence-V.01.
 The complete `provider_calls` ledger contains only the existing successful three-credit odds batch from October 13, 5:42 PM Pacific. No metered call was recorded during the idle interval. The app ledger cannot establish unrelated activity through other credentials/apps; fresh Odds API and OpenRouter balances independently corroborate this result for the configured keys.
 
 Balance observations are saved in ignored `artifacts/overnight-usage-2026-10-14/provider-checks.json`. No keys, passwords, payment details or full environment configuration appear in this report. Temporary local browser testing used disposable credentials and cleared live provider/database keys.
+
+## Post-release confirmation
+
+Read-only account metadata was checked again at **12:51:51 PM Pacific** after deploying the tested NHL statistics adapter. The balances remain **497 remaining/3 used Odds API credits** and **US$0 OpenRouter usage**, with US$3 remaining under the monthly-reset key cap. The wallet still reports US$10 credit and US$0 usage. No paid provider call was recorded after the idle interval began.
+
+The initial live MoneyPuck import succeeded in about 21 seconds. PostgreSQL records one October 14 admission and **33,419,228 bytes** accounted against its 1,500,000,000-byte monthly transfer safeguard. These source transfers do not use odds or AI credits. Render and Supabase dashboard allowances above describe the initial audit observation, not a refreshed hosting invoice after deployment.
