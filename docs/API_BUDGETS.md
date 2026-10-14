@@ -17,6 +17,8 @@ Sources: [Odds API plans](https://the-odds-api.com/), [Odds API quota costs](htt
 
 ## Source checks before testing or integration
 
+The [complete NHL source preflight](NHL_PROVIDER_PREFLIGHT.md) applies this check to the source shortlist and distinguishes published limits, unverified terms, fixed subscriptions, file downloads and metered credits. It also records the direct API-Sports hard quota versus potential RapidAPI overage charges; subscription channel is part of the cost check.
+
 The owner requires cost and access checks before spending time on source trials. For every new provider, document the billing unit, available allowance/reset, applicable use rights, required fields, update frequency and intended workload before data testing. Record unknowns explicitly. Reading public pricing/documentation is part of this check, not permission to begin a metered trial.
 
 An admitted trial must have a small fixed request/byte/row allowance, a time limit, failure accounting and an explicit stopping rule. No account upgrade, automatic top-up, paid fallback or production activation follows from a research test. Confirm chargeable endpoint costs and account caps before paid requests. Use existing local samples for additional checks when possible.

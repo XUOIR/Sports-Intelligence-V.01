@@ -4,6 +4,8 @@ Reviewed October 13, 2026 for XUOIR/Sports-Intelligence-V.01. This is a research
 
 ## Purchase recommendation
 
+For the budget-unrestricted comparison and full preflight results, see [NHL_PROVIDER_PREFLIGHT.md](NHL_PROVIDER_PREFLIGHT.md). Sportlogiq is the preferred premium advanced-data candidate; SportsDataIO is the documented starter-confirmation complement. These are conditional procurement recommendations, with no quote, purchase or claim of universal field coverage.
+
 The owner subsequently clarified the current private statistics-tool use. The [expanded low-cost source review](NHL_LOW_COST_DATA_OPTIONS.md) takes precedence for immediate procurement: test permitted free downloads and public NHL datasets first. The paid providers below remain optional candidates, not prerequisites for a useful NHL statistics release.
 
 Keep the official NHL feed for scores, schedules and basic statistics. Prioritize the missing advanced inputs and confirmed starters. Extra odds capacity is useful after those inputs work, but does not make the model valid by itself.
