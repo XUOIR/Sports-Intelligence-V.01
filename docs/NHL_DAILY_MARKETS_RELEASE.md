@@ -26,6 +26,21 @@ No database schema, credentials, provider budget, staking rule, model approval o
 
 All 158 backend tests and 14 frontend tests passed (172 checks). Frontend type checking and the production build passed. Browser QA verified a complementary 38%/62% test forecast, negative/positive edges, blank unknown values, date navigation, separate saved model grading and ticket returns, and a 390-pixel mobile viewport without horizontal page overflow. Local QA uses disposable SQLite, synthetic prices/forecasts/tickets and real previously audited descriptive statistics; it cannot establish production quote availability. Production deployment IDs, first actual saved quotes and live UI proof still require verification.
 
+## Rollout status — 1:59 PM Pacific
+
+Code is pushed and both authorized Render deploys have been submitted once:
+
+- Backend `1f4d2d69052d946cc6f40195924994716e988e1b`: `dep-db7uhnrl550s73dekqj0`, submitted 1:41:03 PM Pacific.
+- Frontend `d9b82e4`: `dep-db7ulhd9fdbs73dj400g`, submitted 1:49:09 PM Pacific. This later commit changes expected-return labels/tests and research notes; backend code is identical to the backend deployment commit.
+
+Both remained Building with no build logs after approximately eighteen and ten minutes. [Render's incident](https://status.render.com/incidents/8tsd93r1wbmz) concerns builds not starting across all regions, including Oregon. A fresh public status API read at 1:58 PM showed the incident still identified, updated at 1:55 PM; the earlier cached webpage had shown monitoring. This supports a platform queue/start problem; it is not evidence of an application build error. The existing backend `/health/ready` remained 200 and `/performance` remained 404, confirming the new route was not yet live. Do not describe these new pages or the matcher fix as deployed until verified.
+
+**Metered feeds were paused through the existing private Settings control.** The UI shows METERED FEEDS PAUSED and PostgreSQL independently confirms `control:paid = 1`. This prevents another empty manual request through the old matcher. Free NHL scores and descriptive statistics are unaffected by that control. No additional metered odds refresh or AI generation was sent. Fresh provider metadata at 1:58 PM confirmed 494 odds credits remaining/6 used and US$0 OpenRouter usage, with the US$3 monthly-reset cap intact.
+
+Protected local `/bankroll` and `/model-performance` requests without a session returned 307 to `/login`; `/api/data/performance` returned 401. Final browser QA also verified separate probability-point edge and estimated return labels. The illustrative preview is not a production forecast or actual bookmaker price.
+
+To complete rollout: wait for both existing deploys to become Live; confirm their commits, migration logs, health and unauthenticated route protection; then explicitly resume metered feeds and admit **one** guarded three-credit manual refresh. Verify its counts, stored real PlayNow prices, both teams' main-page prices, benchmark source age, and unchanged AI spending. An empty/uncertain request must not be repeated; preserve reservations and diagnose its saved report. No deploy cancellation, duplicate deploy, provider-budget reset or paid fallback was used during the incident.
+
 ## Next steps for verified NHL forecasts
 
 1. Verify a single bounded manual refresh actually saves current PlayNow quotes after deploying the matcher. Check its saved counts and both teams' main-page prices; do not repeat uncertain requests.
