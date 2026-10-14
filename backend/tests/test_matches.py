@@ -52,6 +52,7 @@ def test_date_window_strict():
 def test_request_duration_does_not_skip_next_scheduler_tick(monkeypatch):
     at=now();monkeypatch.setattr(matches,'now',lambda:at)
     assert matches.due((at+timedelta(seconds=.5)).isoformat())
+    assert matches.due((at+timedelta(seconds=8)).isoformat())
     assert not matches.due((at+timedelta(seconds=25)).isoformat())
 
 @pytest.mark.asyncio
@@ -77,7 +78,7 @@ async def test_consecutive_ticks_tolerate_database_lease_jitter(database,monkeyp
     class DelayedLease(Limits):
         async def lease(self,key,seconds=300):
             nonlocal at
-            at+=timedelta(seconds=1.5)
+            at+=timedelta(seconds=8)
             return await super().lease(key,seconds)
     class Response:
         async def request(self,*args,**kwargs):calls.append(at);return payload()

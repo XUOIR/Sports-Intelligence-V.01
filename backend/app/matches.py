@@ -85,7 +85,7 @@ def interval(games,day):
 def due(next_at):
     # The scheduler is on a fixed cadence. Allow a small timer/DB jitter window,
     # while the durable leases prevent concurrent repeats across instances.
-    return not next_at or aware(next_at)<=now()+timedelta(seconds=2)
+    return not next_at or aware(next_at)<=now()+timedelta(seconds=10)
 
 async def enqueue(day):
     async with db.Session.begin() as session:
@@ -131,7 +131,7 @@ async def tick():
     for row in pending:
         try:day=selected_date(row.info['date'])
         except ValueError:continue
-        if day not in days and next_at.get(f'nhl-score:{day}',now())<=now()+timedelta(seconds=2):days.append(day);break
+        if day not in days and next_at.get(f'nhl-score:{day}',now())<=now()+timedelta(seconds=10):days.append(day);break
     for day in days:
         if await limits.blocked('nhl_scores'):break
         await refresh_day(day)
