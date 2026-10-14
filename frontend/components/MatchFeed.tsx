@@ -4,8 +4,9 @@ import {api} from '@/lib/client-api';
 import {shouldPoll} from '@/lib/activity.mjs';
 import {shiftDay,matchTime,matchAge,feedExpired,playVisible} from '@/lib/matches.mjs';
 import type {MatchFeed as Feed,MatchGame} from '@/lib/types';
-export default function MatchFeed({onOpen}:{onOpen:(id:string)=>void}){
-  const [day,setDay]=useState(''),[feed,setFeed]=useState<Feed|null>(null),[error,setError]=useState(''),[expanded,setExpanded]=useState(false),[clock,setClock]=useState(Date.now());
+export default function MatchFeed({onOpen,date,onDateChange}:{onOpen:(id:string)=>void;date?:string;onDateChange?:(date:string)=>void}){
+  const [localDay,setDay]=useState(''),[feed,setFeed]=useState<Feed|null>(null),[error,setError]=useState(''),[expanded,setExpanded]=useState(false),[clock,setClock]=useState(Date.now());
+  const day=date??localDay;
   const [bounds,setBounds]=useState({today:'',min:'',max:''});
   useEffect(()=>{
     let disposed=false,pending:AbortController|null=null,timer:ReturnType<typeof setTimeout>|undefined,failures=0,lastActivity=Date.now(),queuedAt=0;
@@ -28,7 +29,7 @@ export default function MatchFeed({onOpen}:{onOpen:(id:string)=>void}){
     return()=>{disposed=true;pending?.abort();clearTimeout(timer);clearInterval(ticker);events.forEach(e=>window.removeEventListener(e,active));document.removeEventListener('visibilitychange',visibility);};
   },[day]);
   const current=feed&&(!day||feed.date===day)?feed:null,selected=day||feed?.date||'',stale=feedExpired(current,clock)||!!error;
-  function change(value:string){if(value!==selected&&value>=bounds.min&&value<=bounds.max){setDay(value);setFeed(null);setError('');}}
+  function change(value:string){if(value!==selected&&value>=bounds.min&&value<=bounds.max){if(onDateChange)onDateChange(value);else setDay(value);setFeed(null);setError('');}}
   function status(game:MatchGame){return game.schedule_state!=='OK'?game.schedule_state:['FINAL','OFF'].includes(game.game_state)?'Final':['LIVE','CRIT'].includes(game.game_state)?'LIVE':game.game_state==='UNKNOWN'?'Awaiting sync':matchTime(game.commence_time);}
   return <aside className={`match-sidebar ${expanded?'expanded':''}`} aria-label="NHL match feed"><div className="match-sidebar-heading"><h2>{selected&&selected!==bounds.today?'NHL matches':"Today's matches"}</h2><span>PT</span><button className="outline-button" onClick={()=>change(bounds.today)}>Today</button><button className="icon-button feed-collapse" aria-label={expanded?'Collapse matches':'Expand matches'} aria-expanded={expanded} onClick={()=>setExpanded(!expanded)}>{expanded?'−':'+'}</button></div><div className="match-date"><button className="icon-button" aria-label="Previous day" disabled={!selected||selected<=bounds.min} onClick={()=>change(shiftDay(selected,-1))}>‹</button><input type="date" aria-label="Match date" value={selected} min={bounds.min} max={bounds.max} onChange={e=>{if(e.target.value)change(e.target.value)}}/><button className="icon-button" aria-label="Next day" disabled={!selected||selected>=bounds.max} onClick={()=>change(shiftDay(selected,1))}>›</button></div><div className={`match-feed-state ${stale?'stale':''}`} role="status"><span className={`status-dot ${stale?'amber':''}`}/>{error?'CONNECTION INTERRUPTED':current?.paused?'SCORE FEED PAUSED':!current?.observed_at?'LOADING SCORE FEED':stale?'LAST RECEIVED SCORES':'NHL SCORE FEED'}<small>{matchAge(current?.observed_at||null,clock)}</small></div><div className="match-feed-scroll" tabIndex={0} aria-label="Scrollable NHL games">{current?.games.map(game=>{
     const play=playVisible(game,current,clock)&&!error,decision=game.decision==='RECOMMEND'&&!play?'HOLD':game.decision,live=['LIVE','CRIT'].includes(game.game_state);

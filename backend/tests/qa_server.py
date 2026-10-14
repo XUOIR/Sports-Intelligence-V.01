@@ -15,7 +15,7 @@ from uuid import uuid4
 from sqlalchemy.ext.asyncio import create_async_engine,async_sessionmaker
 from app.api import app
 from app import db
-from app.models import Base,Account,Fixture,State,PersonalBet,Outcome,ProviderState
+from app.models import Base,Account,Fixture,State,PersonalBet,Outcome,ProviderState,MarketOdds,Snapshot
 from app.model_config import GATE_NAMES
 from app.clock import now
 
@@ -66,6 +66,20 @@ async def lifespan(application):
                 commence_time=now()+timedelta(hours=3),state=State.HOLD,
                 reason='Local statistics test: illustrative matchup, not an official scheduled game.',
                 metrics={'home_abbrev':'EDM','away_abbrev':'TOR'},gates={}))
+            if os.getenv('QA_MARKET_DISPLAY')=='true':
+                from app.ingestion import quote_identity
+                await session.flush()
+                fixture=await session.get(Fixture,'qa:nhl-stats')
+                fixture.selection=fixture.home;fixture.probability='.62';fixture.edge='.12'
+                for selection,price in [(fixture.home,'2.0'),(fixture.away,'1.8')]:
+                    session.add(MarketOdds(fixture_id=fixture.id,bookmaker='playnow',market='h2h',selection=selection,line=None,
+                        decimal_odds=price,implied_probability=1/float(price),source_at=now(),identity=quote_identity('playnow','h2h',selection,None)))
+                session.add(Fixture(id='qa:tomorrow',sport='NHL',home='QA Tomorrow Home',away='QA Tomorrow Away',
+                    commence_time=(now()+timedelta(days=1)).replace(hour=19),state=State.WATCH,reason='Local test only: missing odds and probabilities.'))
+                session.add(Snapshot(fixture_id=fixture.id,anchor_at=now()-timedelta(days=1),game_date=(now()-timedelta(days=1)).date(),
+                    vector=[],evidence_ids=[],model_version='local-test-only',prediction_home_probability='.62',final_home_win=False))
+                session.add(PersonalBet(request_id=str(uuid4()),fixture_id=fixture.id,selection=fixture.home,odds_taken=2,
+                    stake_cad=10,unit_size_at_execution=100,outcome=Outcome.LOSS,profit_cad=-10))
             async def no_network_sync(**kwargs):
                 return {'status':'disabled_in_offline_qa'}
             nhl_advanced.sync=no_network_sync

@@ -28,7 +28,8 @@ from app.maths import parse_odds, money, profit, roi, decimal
 from app.model_config import UNIT_VALUE_CAD, GATE_NAMES, INITIAL_BANKROLL_CAD
 from app.ingestion import dirty
 from app.providers import complete_roster
-from app.performance import performance
+from app.performance import performance,model_stats
+from app.market_display import latest_quotes
 from app.readiness import fresh_recommendation
 from app.operations import operational_status
 from app.limits import limits,BudgetExceeded
@@ -128,20 +129,33 @@ async def ready(session=Depends(database)):
     return {"status":"ready"}
 
 @app.get("/dashboard", dependencies=[Depends(authorize)])
-async def dashboard(session=Depends(database)):
+async def dashboard(date:str|None=None,session=Depends(database)):
     account = await session.get(Account,1)
     initial = account.initial_bankroll if account else INITIAL_BANKROLL_CAD
     net = await session.scalar(select(func.coalesce(func.sum(PersonalBet.profit_cad),0)))
     exposure = await session.scalar(select(func.coalesce(func.sum(PersonalBet.stake_cad),0)).where(PersonalBet.outcome == Outcome.PENDING))
     settled = await session.scalar(select(func.coalesce(func.sum(PersonalBet.stake_cad),0)).where(PersonalBet.outcome.in_([Outcome.WIN,Outcome.LOSS,Outcome.PUSH])))
-    fixtures = (await session.scalars(select(Fixture).where(Fixture.sport.in_(settings.active_sports),Fixture.commence_time >= now()-timedelta(hours=12)).order_by(Fixture.commence_time).limit(200))).all()
-    latest = await session.scalar(select(func.max(MarketOdds.source_at)).join(Fixture,MarketOdds.fixture_id==Fixture.id)
-        .where(Fixture.sport.in_(settings.active_sports),MarketOdds.source_at<=now()))
+    statement=select(Fixture).where(Fixture.sport.in_(settings.active_sports))
+    if date:
+        try:day=matches.selected_date(date)
+        except ValueError as exc:raise HTTPException(422,str(exc)) from None
+        beginning=now().replace(year=day.year,month=day.month,day=day.day,hour=0,minute=0,second=0,microsecond=0)
+        statement=statement.where(Fixture.commence_time>=beginning,Fixture.commence_time<beginning+timedelta(days=1))
+    else:statement=statement.where(Fixture.commence_time>=now()-timedelta(hours=12))
+    fixtures = (await session.scalars(statement.order_by(Fixture.commence_time).limit(200))).all()
+    quotes=await latest_quotes(session,[f.id for f in fixtures])
+    latest=max((aware(q.source_at) for rows in quotes.values() for q in rows if aware(q.source_at)<=now()),default=None)
     return {"bankroll": str(money(initial+net)), "available":str(money(initial+net-exposure)), "exposure":str(money(exposure)),
         "profit":str(money(net)), "roi":str(roi(net,settled)), "unit_value":str(UNIT_VALUE_CAD),
         "source_updated_at":aware(latest) if latest else None, "server_time":now(), "fixtures":[safe_fixture(f) for f in fixtures],
         "stale":latest is None or now()-aware(latest) > timedelta(minutes=5), "performance":await performance(session),
+        "market_odds":{fid:[serialize(q) for q in rows] for fid,rows in quotes.items()},
         "active_sports":list(settings.active_sports),"operations":await operational_status(session)}
+
+@app.get('/performance',dependencies=[Depends(authorize)])
+async def sport_performance(sport:str='NHL',session=Depends(database)):
+    if sport not in settings.active_sports:raise HTTPException(422,'Sport is not active')
+    return await model_stats(session,sport)
 
 @app.get('/operations',dependencies=[Depends(authorize)])
 async def operations(session=Depends(database)):

@@ -60,6 +60,22 @@ async def setup_quotes(database,monkeypatch,fail=False):
     monkeypatch.setattr(providers,'http',SafeHTTP(Limits(),httpx.MockTransport(response)))
     return calls
 
+async def test_empty_success_reports_no_quotes_and_blocks_another_credit_spend(database,monkeypatch):
+    await setup_quotes(database,monkeypatch)
+    requests=[]
+    def response(request):
+        metadata=request.url.path=='/v4/sports/'
+        headers={'x-requests-remaining':'500' if metadata else '497','x-requests-used':'0' if metadata else '3','x-requests-last':'0' if metadata else '3'}
+        if not metadata:requests.append(request)
+        return httpx.Response(200,json=[{'key':'icehockey_nhl'}] if metadata else [],headers=headers)
+    monkeypatch.setattr(providers,'http',SafeHTTP(Limits(),httpx.MockTransport(response)))
+    result=await manual_odds.refresh(uuid4())
+    assert result['status']=='succeeded' and result['ingestion']['quotes_saved']==0
+    assert 'paused' in result['message'] and await Limits().blocked('odds')
+    with pytest.raises(Exception):await manual_odds.refresh(uuid4())
+    assert len(requests)==1
+    async with database() as session:assert await session.scalar(select(func.count()).select_from(ProviderCall))==1
+
 async def test_manual_api_is_private_idempotent_and_can_refresh_twice_within_two_hours(database,monkeypatch):
     calls=await setup_quotes(database,monkeypatch)
     request_id=str(uuid4());url='/operations/odds-refresh'
@@ -71,6 +87,8 @@ async def test_manual_api_is_private_idempotent_and_can_refresh_twice_within_two
             assert result.status_code==200,result.text
             assert result.json()['status']=='succeeded' and result.json()['credits_reserved']==3
         assert len(calls)==1
+        assert result.json()['ingestion']['quotes_saved']==2
+        assert result.json()['ingestion']['playnow_quotes_saved']==2
         assert (await client.get(f'{url}/{request_id}',headers=HEADERS)).json()['status']=='succeeded'
         assert (await client.post(url,headers=HEADERS,json={'request_id':str(uuid4())})).json()['status']=='succeeded'
         await client.get('/dashboard',headers=HEADERS);await client.get('/operations',headers=HEADERS)

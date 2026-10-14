@@ -207,8 +207,9 @@ async def ingest_esports():
                     log.warning("PandaScore payload structure changed: %s", type(exc).__name__)
             await session.commit()
 
-async def ingest_odds(*,refresh_id=None):
+async def ingest_odds(*,refresh_id=None,report=None):
     reevaluate = set()
+    counts={'events_received':0,'events_matched':0,'events_unmatched':0,'quotes_saved':0,'playnow_quotes_saved':0}
     for sport in providers.ODDS_SPORTS:
         if sport not in settings.active_sports:continue
         async with db.Session() as session:
@@ -216,16 +217,23 @@ async def ingest_odds(*,refresh_id=None):
                 Fixture.commence_time>now(),Fixture.commence_time<=now()+timedelta(hours=48)).limit(1))
         if sport=='NHL' and not scheduled:continue
         rows = await providers.odds(sport,refresh_id=refresh_id) if refresh_id else await providers.odds(sport)
+        counts['events_received']+=len(rows)
         async with db.Session() as session:
             for row in rows:
                 try:
                     start = aware(row["commence_time"])
+                    # NHL listings may use advertised start vs. puck drop (the
+                    # October 14 zero-credit events check showed +10 minutes).
+                    # Exact ordered participants and a unique match are still
+                    # required. Never reschedule the official NHL anchor here.
+                    tolerance=timedelta(minutes=15 if sport=='NHL' else 5)
                     candidates = (await session.scalars(select(Fixture).where(Fixture.sport == sport,
-                        Fixture.commence_time >= start-timedelta(minutes=5), Fixture.commence_time <= start+timedelta(minutes=5)))).all()
+                        Fixture.commence_time >= start-tolerance, Fixture.commence_time <= start+tolerance))).all()
                     matching = [f for f in candidates if normalized(f.home) == normalized(row["home_team"]) and normalized(f.away) == normalized(row["away_team"])]
                     if len(matching) > 1:
                         raise ValueError("Ambiguous provider fixture mapping")
                     if sport=='NHL' and not matching:
+                        counts['events_unmatched']+=1
                         log.warning('NHL odds could not be matched to an official fixture; row discarded')
                         continue
                     fixture = matching[0] if matching else await session.get(Fixture, f"odds:{row['id']}")
@@ -235,6 +243,9 @@ async def ingest_odds(*,refresh_id=None):
                         await session.flush()
                     elif fixture.id.startswith("odds:") and aware(fixture.commence_time)!=start:
                         await reschedule(session,fixture,start)
+                    counts['events_matched']+=1
+                    fixture.metrics={**fixture.metrics,'odds_event_id':str(row['id'])[:100],
+                        'odds_event_start':start.isoformat(),'odds_start_offset_seconds':int((start-aware(fixture.commence_time)).total_seconds())}
                     executable_sides=set()
                     for book in providers.array(row, "bookmakers", 20):
                         bookmaker = providers.BOOKMAKER_ALIASES.get(book["key"], book["key"])
@@ -269,6 +280,8 @@ async def ingest_odds(*,refresh_id=None):
                                             reevaluate.add(fixture.id)
                                     session.add(MarketOdds(fixture_id=fixture.id, bookmaker=bookmaker, market=key, selection=selection,
                                         line=line, decimal_odds=price, implied_probability=q, source_at=source_at, identity=identity))
+                                    counts['quotes_saved']+=1
+                                    counts['playnow_quotes_saved']+=int(bookmaker in {'playnow','bclc'})
                                     fixture.updated_at = now()
                                 except (ValueError,KeyError,TypeError):
                                     log.warning("Invalid odds discarded for %s", fixture.id)
@@ -279,6 +292,7 @@ async def ingest_odds(*,refresh_id=None):
                 except (KeyError,ValueError,TypeError) as exc:
                     log.warning("Odds payload structure changed: %s", type(exc).__name__)
             await session.commit()
+    if report is not None:report.update(counts)
     return reevaluate
 
 async def ingest_results():

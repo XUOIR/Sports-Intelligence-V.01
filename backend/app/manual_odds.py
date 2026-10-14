@@ -21,7 +21,8 @@ async def lookup(request_id):
         completed=row.status=='SUCCEEDED' and row.response_metadata.get('odds_sync_status')=='complete'
         state='succeeded' if completed else row.status.lower() if row.status in {'FAILED','UNKNOWN'} else 'in_progress' if now()-aware(row.created_at)<=timedelta(seconds=60) else 'unknown'
         return {'request_id':str(request_id),'status':state,'attempted_at':aware(row.created_at),
-            'credits_reserved':row.units,'synced_at':row.response_metadata.get('synced_at')}
+            'credits_reserved':row.units,'synced_at':row.response_metadata.get('synced_at'),
+            'ingestion':row.response_metadata.get('ingestion'),'message':row.response_metadata.get('message')}
 
 async def refresh(request_id):
     request_id=str(request_id)
@@ -40,8 +41,18 @@ async def refresh(request_id):
                 scheduled=await session.scalar(select(Fixture.id).where(Fixture.sport=='NHL',Fixture.commence_time>now(),
                     Fixture.commence_time<=now()+timedelta(hours=48)).limit(1))
             if not scheduled:return {'request_id':request_id,'status':'skipped','message':'No upcoming NHL games within 48 hours; no credits used'}
-            await ingest_odds(refresh_id=request_id)
-            await limits.finish(call_id(request_id),'SUCCEEDED',metadata={'odds_sync_status':'complete','synced_at':now().isoformat()})
+            report={}
+            await ingest_odds(refresh_id=request_id,report=report)
+            message=f"Saved {report['quotes_saved']} quotes ({report['playnow_quotes_saved']} PlayNow) from {report['events_matched']} matched games."
+            if not report['events_matched']:
+                message='The provider responded, but no events matched official fixtures. Odds refresh is paused to protect credits.'
+                await limits.trip('odds',reason=message)
+            elif not report['quotes_saved']:
+                message='No new valid prices were saved. Existing prices are retained; refresh is paused to avoid repeated empty requests.'
+                await limits.trip('odds',reason=message)
+            elif not report['playnow_quotes_saved']:
+                message+=' No new PlayNow quotes were supplied; other books are comparison prices only.'
+            await limits.finish(call_id(request_id),'SUCCEEDED',metadata={'odds_sync_status':'complete','synced_at':now().isoformat(),'ingestion':report,'message':message})
             result=await lookup(request_id)
             if result is None:raise ProviderError('Refresh was not admitted; no automatic resend')
             return result

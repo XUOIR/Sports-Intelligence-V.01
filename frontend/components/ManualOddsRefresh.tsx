@@ -14,7 +14,7 @@ export default function ManualOddsRefresh({window,disabled,onRequest,onCheck,onU
   const accept=useCallback((result:OddsRefreshResult,saved:Saved)=>{
     if(result.status==='in_progress'||result.status==='not_sent'&&Date.now()-saved.started<60000){setMessage('Checking the saved refresh. No second request will be sent.');return;}
     setPending(null);try{localStorage.removeItem(storage);}catch{}
-    setMessage(result.status==='succeeded'?'NHL odds refresh completed.':result.status==='skipped'?result.message||'No upcoming games; no credits used.':result.status==='not_sent'?'The request did not reach Odds API. No refresh slot was used.':result.status==='unknown'?'The previous attempt is unconfirmed and will not be repeated. Its refresh slot stays used.':'The refresh failed. Its slot stays used if the request reached Odds API.');
+    setMessage(result.status==='succeeded'?result.message||'NHL odds refresh completed.':result.status==='skipped'?result.message||'No upcoming games; no credits used.':result.status==='not_sent'?'The request did not reach Odds API. No refresh slot was used.':result.status==='unknown'?'The previous attempt is unconfirmed and will not be repeated. Its refresh slot stays used.':'The refresh failed. Its slot stays used if the request reached Odds API.');
     updateRef.current();
   },[]);
   useEffect(()=>{if(!pending)return;let stopped=false,timer:ReturnType<typeof setTimeout>;

@@ -6,7 +6,7 @@ async function proxy(request: NextRequest,{params}:{params:Promise<{path:string[
   if(!await authenticated())return NextResponse.json({detail:'Sign in to view your workspace'},{status:401});
   if(request.method!=='GET' && !sameOrigin(request)) return NextResponse.json({detail:'Origin rejected'},{status:403});
   const {path}=await params;
-  const allowed = path.length===1 && ['dashboard','bets','operations','matches'].includes(path[0])
+  const allowed = path.length===1 && ['dashboard','bets','operations','matches','performance'].includes(path[0])
     || path.length===2 && path[0]==='matches' && path[1]==='sync'
     || path.length===2 && ['fixtures','bets'].includes(path[0])
     || path.length===2 && path[0]==='operations' && ['pause','resume','allowances','odds-refresh','nhl-statistics-refresh'].includes(path[1])
@@ -18,7 +18,8 @@ async function proxy(request: NextRequest,{params}:{params:Promise<{path:string[
   let body:string|undefined;
   try{body=request.method==='GET'?undefined:await readLimited(request.body,16384);}catch{return NextResponse.json({detail:'Request too large'},{status:413});}
   const query=new URLSearchParams();
-  if(path[0]==='matches'){const date=request.nextUrl.searchParams.get('date');if(date){if(!/^\d{4}-\d{2}-\d{2}$/.test(date))return NextResponse.json({detail:'Invalid match date'},{status:422});query.set('date',date);}}
+  if(['matches','dashboard'].includes(path[0])){const date=request.nextUrl.searchParams.get('date');if(date){if(!/^\d{4}-\d{2}-\d{2}$/.test(date))return NextResponse.json({detail:'Invalid match date'},{status:422});query.set('date',date);}}
+  if(path[0]==='performance'){const sport=request.nextUrl.searchParams.get('sport');if(sport){if(!/^(NHL|CS2|MLB|NBA|NFL|VAL|LOL)$/.test(sport))return NextResponse.json({detail:'Invalid sport'},{status:422});query.set('sport',sport);}}
   for(const name of ['limit','offset']){ const value=request.nextUrl.searchParams.get(name); if(value)query.set(name,value); }
   try {
     const result=await fetch(`${base.replace(/\/$/,'')}/${path.map(encodeURIComponent).join('/')}?${query}`,{
