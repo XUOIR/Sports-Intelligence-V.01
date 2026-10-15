@@ -15,6 +15,7 @@ from .models import ProviderState, RuntimeLimit, Fixture, State
 from .limits import limits, BudgetExceeded
 from .http import http, ProviderError
 from .readiness import fresh_recommendation
+from .market_display import latest_quotes
 
 LIVE={'LIVE','CRIT'}
 FINAL={'FINAL','OFF'}
@@ -151,6 +152,7 @@ async def feed(session,day):
     fixtures=(await session.scalars(select(Fixture).where(Fixture.sport=='NHL',
         Fixture.commence_time>=datetime.combine(day,time.min,tzinfo=PACIFIC),Fixture.commence_time<datetime.combine(day+timedelta(days=1),time.min,tzinfo=PACIFIC)).limit(40))).all()
     lookup={f.id:f for f in fixtures}
+    quotes=await latest_quotes(session,list(lookup))
     games=[dict(g) for g in cached.info['games']] if cached else []
     stale=not cached or now()<aware(cached.observed_at) or now()>aware(cached.info['next_at'])+timedelta(seconds=60)
     if cached and failed and aware(failed.observed_at)>=aware(cached.observed_at):stale=True
@@ -161,6 +163,8 @@ async def feed(session,day):
         state='WATCH';reason='No verified pregame decision recorded';verified=False
         if fixture:
             game.update(home=fixture.home,away=fixture.away)
+            for side in ('home','away'):
+                game.setdefault(side+'_abbrev',fixture.metrics.get(side+'_abbrev'))
             state=fixture.state.value;reason=fixture.reason
             if state=='RECOMMEND':
                 verified=not stale and fresh_recommendation(fixture) and game['game_state'] in {'FUT','PRE'} and game['schedule_state']=='OK'
@@ -171,6 +175,17 @@ async def feed(session,day):
             'game_state':'UNKNOWN','schedule_state':'OK','home_score':None,'away_score':None,'period':None,'clock':None,
             'decision':'HOLD' if f.state==State.RECOMMEND else f.state.value,'verified_play':False,'reason':'Score feed awaiting sync',
             'detail_available':True} for f in fixtures]
+    for game in games:
+        fixture=lookup.get(game['id'])
+        if fixture:
+            for side in ('home','away'):
+                game.setdefault(side+'_abbrev',fixture.metrics.get(side+'_abbrev'))
+        # Shared saved prices only. A feed read cannot trigger an odds refresh.
+        game['market_odds']=[{'id':q.id,'bookmaker':q.bookmaker,'market':q.market,
+            'selection':q.selection,'line':str(q.line) if q.line is not None else None,
+            'decimal_odds':str(q.decimal_odds),'implied_probability':str(q.implied_probability),
+            'source_at':aware(q.source_at).isoformat()} for q in quotes.get(game['id'],[])
+            if q.bookmaker in {'playnow','bclc'} and q.market=='h2h' and q.line is None]
     rank=lambda g:0 if g['game_state'] in LIVE else 2 if g['game_state'] in FINAL else 1
     games.sort(key=lambda g:(rank(g),g['commence_time'],g['id']))
     return {'date':str(day),'today':str(now().date()),'min_date':str(now().date()-timedelta(days=7)),

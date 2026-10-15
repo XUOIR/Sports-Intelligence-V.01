@@ -6,6 +6,20 @@ from app.api import app
 from app.clock import now
 from app.models import Fixture, PersonalBet, Outcome, Snapshot
 
+async def test_even_forecasts_are_graded_for_brier_but_have_no_direction(database):
+    from app.performance import model_stats
+    async with database.begin() as session:
+        session.add(Fixture(id='nhl:even',sport='NHL',home='Home',away='Away',commence_time=now()))
+        await session.flush()
+        session.add(Snapshot(fixture_id='nhl:even',anchor_at=now(),game_date=now().date(),vector=[],
+            evidence_ids=[],model_version='test',prediction_home_probability=Decimal('.5'),final_home_win=True))
+    async with database() as session:
+        result=await model_stats(session,'NHL')
+        assert result['model']=={'evaluated':1,'accuracy':None,'brier':'0.2500','predicted':1,'pending':0}
+        assert result['predictions'][0]['selection']=='Even match'
+        assert result['predictions'][0]['result']=='NO DIRECTION'
+        assert (await model_stats(session,'CS2'))['model']['predicted']==0
+
 HEADERS={'Authorization':'Bearer test-session-token-32-characters-long'}
 
 async def overview():

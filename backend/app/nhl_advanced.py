@@ -26,7 +26,7 @@ from .config import settings
 from .limits import limits, BudgetExceeded
 from .models import ProviderState, RuntimeLimit, AuditLog
 from .nhl_data import (TEAM_FIELDS, GOALIE_FIELDS, csv_rows, validate_team, validate_goalie,
-                       rolling, pair_checks, goalie_checks, nhl_checks)
+                       rolling, team_context, pair_checks, goalie_checks, nhl_checks)
 
 TEAM_URL = "https://moneypuck.com/moneypuck/playerData/careers/gameByGame/all_teams.csv"
 GOALIE_URL = "https://peter-tanner.com/moneypuck/downloads/seasonPlayersSummary/goalies/2026.zip"
@@ -132,6 +132,7 @@ def build_batch(team_path, goalie_path, day, reference, sources):
     if source_team_games != source_goalie_games:
         raise ValueError("Team and goalie files have different game coverage")
     team_windows = {team: rolling(teams, day, team=team) for team in sorted({r["playerTeam"] for r in teams})}
+    contexts={team:team_context(teams,day,team) for team in team_windows}
     goalie_windows = {}
     for player in sorted({r["playerId"] for r in goalies}):
         rows = [r for r in goalies if r["playerId"] == player and r["situation"] == "all"]
@@ -145,7 +146,7 @@ def build_batch(team_path, goalie_path, day, reference, sources):
             "latest_game_date": max(r["gameDate"] for r in teams), "sources": sources,
             "team_games": len(source_team_games), "verified_games_previous_day": official["completed_games"],
             "historical_identity_rows_quarantined": quarantined, "teams": team_windows, "goalies": goalie_windows,
-            "model_approved_by_import": False, "starters_confirmed_by_import": False}
+            "team_context":contexts,"model_approved_by_import": False, "starters_confirmed_by_import": False}
 
 
 async def reserve_batch():
@@ -325,5 +326,6 @@ async def frozen_context(session, fixture, anchor):
             'cache_observed_at':aware(row.observed_at).isoformat(),'anchor_at':at.isoformat(),
             'as_of_date':batch['as_of_date'],'verified_through':batch['verified_through'],'sources':sources,
             'teams':{side:batch['teams'][code] for side,code in codes.items()},
+            'team_context':{side:batch.get('team_context',{}).get(code) for side,code in codes.items()},
             'goalie_candidates':[g for g in batch.get('goalies',{}).values() if g.get('latest_team') in codes.values()],
             'starters_confirmed_by_import':False,'model_approved_by_import':False}

@@ -20,6 +20,14 @@ test('both selected-side orientations produce complementary win probabilities',(
   for(const probability of [null,'',NaN,'1.1'])assert.equal(probabilities({...fixture,probability}),null);
   assert.equal(probabilities({...fixture,selection:'Other'}),null);
 });
+test('new partial, invalid or future quotes cannot revive an older complete pair',()=>{
+  const older=[quote('Home'),quote('Away')];
+  for(const patch of [{source_at:new Date(at+1000).toISOString()},
+    {source_at:new Date(at+1000).toISOString(),decimal_odds:'invalid'}]){
+    assert.equal(moneylinePair(fixture,[...older,{...quote('Home'),...patch}],at+2000),null);
+  }
+  assert.equal(moneylinePair(fixture,[...older,quote('Home','playnow',new Date(at+1000).toISOString())],at),null);
+});
 test('edge is signed probability points, and fair odds use the model probability',()=>{
   assert.ok(Math.abs(priceComparison(.6,2).edge-.1)<1e-10);
   assert.ok(Math.abs(priceComparison(.4,2).edge+.1)<1e-10);

@@ -383,6 +383,12 @@ async def verified_evidence(fixture_id: str, body: EvidenceInput, session=Depend
         if body.factors is not None and now()>=aware(fixture.commence_time)-timedelta(minutes=30) and {k:float(v) for k,v in body.factors.items()}!=fixture.metrics.get('factors',{}):
             raise HTTPException(409,'The factor inputs are frozen at T−30; changed or missing factors cannot be backfilled')
         factors = fixture.metrics.get("factors",{})
+        if fixture.sport=='NHL':
+            # Retain each confirmation/retraction as immutable observed evidence.
+            # A later metrics edit cannot rewrite who was known at the anchor.
+            session.add(Evidence(fixture_id=fixture_id,kind='nhl_starters',source_at=source,
+                observed_at=now(),payload={'confirmed':body.personnel_confirmed,
+                    'home':body.home_goalie,'away':body.away_goalie,'source_url':body.source_reference}))
         if body.factors is not None and now() < aware(fixture.commence_time)-timedelta(minutes=30):
             factors = {k:float(v) for k,v in body.factors.items()}
             session.add(Evidence(fixture_id=fixture_id,kind="model_factors",source_at=source,observed_at=now(),payload=factors))

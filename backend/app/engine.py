@@ -19,6 +19,7 @@ from .nhl_advanced import frozen_context
 from .nhl_history import HISTORY_CONTRACT
 from .verification import price_pair, current_timestamp
 from .market_display import latest_quotes
+from .nhl_factors import normalized_factors
 
 async def freeze(fixture_id: str):
     async with db.Session.begin() as session:
@@ -66,6 +67,20 @@ async def freeze(fixture_id: str):
             p = None
             fixture.state, fixture.reason = State.HOLD, f"Advanced factors missing: {str(exc)[:200]}"
         advanced_context=await frozen_context(session,fixture,anchor)
+        research=None
+        if advanced_context:
+            starter=await session.scalar(select(Evidence).where(Evidence.fixture_id==fixture_id,
+                Evidence.kind=='nhl_starters',Evidence.observed_at<=anchor)
+                .order_by(Evidence.observed_at.desc(),Evidence.id.desc()).limit(1))
+            try:
+                if starter is None:raise ValueError('Source-backed starting goalies not recorded before T−30')
+                starter_source={'source_at':aware(starter.source_at).isoformat(),
+                    'observed_at':aware(starter.observed_at).isoformat(),'payload':starter.payload,'evidence_id':starter.id}
+                form={side:{'days_rest':vector[10 if side=='home' else 11]} for side in ('home','away')}
+                research=normalized_factors(advanced_context,starter_source,form,anchor)
+            except (ValueError,KeyError,TypeError,AttributeError) as exc:
+                research={'classification':'research_inputs_only','status':'blocked','reason':str(exc)[:200],
+                    'approved_for_prediction':False}
         collected=now()
         if collected>anchor+timedelta(seconds=5):
             fixture.state,fixture.reason=State.HOLD,"Anchor processing deadline exceeded; no late snapshot"
@@ -75,7 +90,7 @@ async def freeze(fixture_id: str):
             context={"sources": {k:{"source_at":aware(r.source_at).isoformat(),"observed_at":aware(r.observed_at).isoformat(),"payload":r.payload} for k,r in selected.items()},
                 "factors":factor_source.payload if factor_source else {},
                 "factor_source":{"source_at":aware(factor_source.source_at).isoformat(),"observed_at":aware(factor_source.observed_at).isoformat(),"payload":factor_source.payload} if factor_source else None,
-                "nhl_statistics":advanced_context}))
+                "nhl_statistics":advanced_context,"research_factors":research}))
         fixture.dirty = True
 
 def recommendation_state(gates: dict, *, has_execution: bool, personnel: bool, edge: Decimal | None, frozen: bool):

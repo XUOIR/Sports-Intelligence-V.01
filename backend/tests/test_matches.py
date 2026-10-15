@@ -6,7 +6,7 @@ import pytest
 from sqlalchemy import select,func
 from app import matches
 from app.clock import now
-from app.models import Fixture,State,ProviderState,ProviderCall,RuntimeLimit
+from app.models import Fixture,State,ProviderState,ProviderCall,RuntimeLimit,MarketOdds
 from app.http import SafeHTTP,ProviderError
 from app.limits import Limits,BudgetExceeded
 from app.config import settings
@@ -48,6 +48,25 @@ def test_date_window_strict():
     assert matches.selected_date(str(now().date()))==now().date()
     for date in ['2026-2-01','2026-02-30','x',str(now().date()+timedelta(days=8))]:
         with pytest.raises(ValueError):matches.selected_date(date)
+
+@pytest.mark.asyncio
+async def test_sidebar_saved_odds_and_logos_do_not_request_any_provider(database,monkeypatch):
+    async def forbidden(*args,**kwargs):pytest.fail('Sidebar reads must never request a provider')
+    monkeypatch.setattr(matches.http,'request',forbidden)
+    at=now();gid='nhl:2026020102'
+    async with database.begin() as session:
+        session.add(Fixture(id=gid,sport='NHL',home='QA Home',away='QA Away',commence_time=at+timedelta(hours=2),
+            metrics={'home_abbrev':'TOR','away_abbrev':'EDM'}))
+        await session.flush()
+        for side in ('QA Home','QA Away'):
+            session.add(MarketOdds(fixture_id=gid,bookmaker='playnow',market='h2h',selection=side,line=None,
+                identity=side,decimal_odds=2,implied_probability='.5',source_at=at-timedelta(minutes=10)))
+    async with database() as session:
+        game=(await matches.feed(session,at.date()))['games'][0]
+        assert game['home_abbrev']=='TOR' and game['away_abbrev']=='EDM'
+        assert len(game['market_odds'])==2 and game['market_odds'][0]['decimal_odds']=='2.00000000'
+        assert not game['verified_play']
+        assert await session.scalar(select(func.count()).select_from(ProviderCall))==0
 
 def test_request_duration_does_not_skip_next_scheduler_tick(monkeypatch):
     at=now();monkeypatch.setattr(matches,'now',lambda:at)

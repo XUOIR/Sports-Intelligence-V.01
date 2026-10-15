@@ -1,15 +1,17 @@
 // Stored two-outcome moneyline comparisons only. No provider requests or writes.
 export function moneylinePair(fixture,quotes=[],now=Date.now(),books=['playnow','bclc']){
   for(const book of books){
-    const groups=new Map();
+    const latest=new Map();
     for(const q of quotes){
-      const price=Number(q.decimal_odds),at=Date.parse(q.source_at);
-      if(q.bookmaker!==book||q.market!=='h2h'||q.line!==null||!Number.isFinite(price)||price<=1.0001||!Number.isFinite(at)||at>now||![fixture.home,fixture.away].includes(q.selection))continue;
-      const group=groups.get(at)||{};group[q.selection]=q;groups.set(at,group);
+      const at=Date.parse(q.source_at);
+      if(q.bookmaker!==book||q.market!=='h2h'||q.line!==null||!Number.isFinite(at)||![fixture.home,fixture.away].includes(q.selection))continue;
+      if(!latest.has(q.selection)||at>Date.parse(latest.get(q.selection).source_at))latest.set(q.selection,q);
     }
-    for(const [at,group] of [...groups].sort((a,b)=>b[0]-a[0])){
-      if(group[fixture.home]&&group[fixture.away])return {book,home:group[fixture.home],away:group[fixture.away],source_at:group[fixture.home].source_at,stale:now-at>300000};
-    }
+    const home=latest.get(fixture.home),away=latest.get(fixture.away);
+    if(!home||!away||Date.parse(home.source_at)!==Date.parse(away.source_at))continue;
+    const at=Date.parse(home.source_at);
+    if(at>now||![home,away].every(q=>Number.isFinite(Number(q.decimal_odds))&&Number(q.decimal_odds)>1.0001))continue;
+    return {book,home,away,source_at:home.source_at,stale:now-at>300000};
   }
   return null;
 }

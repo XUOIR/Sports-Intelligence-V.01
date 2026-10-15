@@ -144,8 +144,38 @@ def rolling(rows, target, *, team=None, goalie=None, season=SEASON, limit=10, mi
     else:
         xga = sum((number(row["xGoals"]) for row in selected), Decimal(0))
         goals = sum((number(row["goals"]) for row in selected), Decimal(0))
-        result.update(player_id=str(goalie), situation="all", xga=str(xga),
+        ice = sum((number(row["icetime"]) for row in selected), Decimal(0))
+        result.update(player_id=str(goalie), situation="all", ice_time_seconds=str(ice), xga=str(xga),
                       goals_against=str(goals), gsax=str(xga - goals))
+    return result
+
+
+def team_context(rows, target, team, limit=10, minimum=3):
+    """Power-play/penalty-kill rates and venue splits from the same admitted file."""
+    result = {}
+    for name, situation, venue in (('power_play','5on4',None),('penalty_kill','4on5',None),
+                                    ('home_venue','all','HOME'),('away_venue','all','AWAY')):
+        eligible = []
+        seen = set()
+        for row in rows:
+            if (row['season'] != str(SEASON) or row['playerTeam'] != team
+                    or row['situation'] != situation or row['gameId'][4:6] != '02'
+                    or venue and row['home_or_away'] != venue):continue
+            _, day = validate_team(row)
+            if day >= target:continue
+            if row['gameId'] in seen:raise ValueError('Duplicate team context game')
+            seen.add(row['gameId']);eligible.append((day,row['gameId'],row))
+        chosen=sorted(eligible,reverse=True)[:limit]
+        ice=sum((number(r['iceTime']) for _,_,r in chosen),Decimal(0))
+        entry={'sample_games':len(chosen),'game_ids':[g for _,g,_ in chosen],
+            'latest_game_date':chosen[0][0].isoformat() if chosen else None,
+            'target_date':target.isoformat(),'situation':situation,'venue':venue,
+            'status':'available' if len(chosen)>=minimum and ice>0 else 'insufficient_sample'}
+        if entry['status']=='available':
+            xf=sum((number(r['xGoalsFor']) for _,_,r in chosen),Decimal(0))
+            xa=sum((number(r['xGoalsAgainst']) for _,_,r in chosen),Decimal(0))
+            entry.update(xgf_per_60=str(xf*3600/ice),xga_per_60=str(xa*3600/ice),ice_time_seconds=str(ice))
+        result[name]=entry
     return result
 
 

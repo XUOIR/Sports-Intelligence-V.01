@@ -95,7 +95,7 @@ async def lifespan(application):
                 fixture.selection=fixture.home;fixture.probability='.62';fixture.edge='.12'
                 for selection,price in [(fixture.home,'2.0'),(fixture.away,'1.8')]:
                     session.add(MarketOdds(fixture_id=fixture.id,bookmaker='playnow',market='h2h',selection=selection,line=None,
-                        decimal_odds=price,implied_probability=1/float(price),source_at=now(),identity=quote_identity('playnow','h2h',selection,None)))
+                        decimal_odds=price,implied_probability=1/float(price),source_at=observed,identity=quote_identity('playnow','h2h',selection,None)))
                 session.add(Fixture(id='qa:tomorrow',sport='NHL',home='QA Tomorrow Home',away='QA Tomorrow Away',
                     commence_time=(now()+timedelta(days=1)).replace(hour=19),state=State.WATCH,reason='Local test only: missing odds and probabilities.'))
                 session.add(Snapshot(fixture_id=fixture.id,anchor_at=now()-timedelta(days=1),game_date=(now()-timedelta(days=1)).date(),
@@ -110,9 +110,14 @@ async def lifespan(application):
             for index,(state,decision,hours) in enumerate([('FUT',State.HOLD,2),('LIVE',State.PASS,-1),('OFF',State.WATCH,-4)]):
                 fid=f'nhl:{index+1}';start=now()+timedelta(hours=hours)
                 session.add(Fixture(id=fid,sport='NHL',home=f'QA Home {index+1}',away=f'QA Away {index+1}',commence_time=start,
-                    state=decision,reason='Disposable local QA match. No real betting evidence.',metrics={},gates={}))
+                    state=decision,reason='Disposable local QA match. No real betting evidence.',metrics={'home_abbrev':'TOR','away_abbrev':'EDM'},gates={}))
+                await session.flush()
+                for side,price in [('Home','1.9'),('Away','2.1')]:
+                    session.add(MarketOdds(fixture_id=fid,bookmaker='playnow',market='h2h',selection=f'QA {side} {index+1}',
+                        line=None,identity=f'qa:{side}',decimal_odds=price,implied_probability=1/float(price),
+                        source_at=start-timedelta(hours=hours,minutes=10 if index==1 else 0)))
                 games.append({'id':fid,'sport':'NHL','home':f'QA Home {index+1}','away':f'QA Away {index+1}',
-                    'home_abbrev':'QAH','away_abbrev':'QAA','commence_time':start.isoformat(),'game_state':state,'schedule_state':'OK',
+                    'home_abbrev':'TOR','away_abbrev':'EDM','commence_time':start.isoformat(),'game_state':state,'schedule_state':'OK',
                     'home_score':None if state=='FUT' else 3,'away_score':None if state=='FUT' else 1,
                     'period':2,'period_type':'REG','clock':'14:21','intermission':False})
             for days in [-1,0,1]:

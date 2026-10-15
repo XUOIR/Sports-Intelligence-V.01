@@ -1,0 +1,17 @@
+/* Use the established theme for section headings; team names stay legible. */
+:is(.page-heading h1,.daily-heading h2,.market-heading h2,.card-heading h2,.section-heading h2,.match-sidebar-heading h2,.nhl-statistics h3,.drawer h3,.wager-modal h2,.login-card h1,.table-empty h3){background:linear-gradient(110deg,#4ac8ff 0%,#6195ff 45%,#a678ff 95%);background-clip:text;-webkit-background-clip:text;color:transparent}
+.page-heading h1,.daily-heading h2{width:fit-content;max-width:100%}
+.match-feed-teams>.feed-team{display:grid;grid-template-columns:20px minmax(0,1fr) 35px 12px;align-items:center;gap:5px;min-height:25px}
+.match-sidebar .team-logo{display:flex;align-items:center;justify-content:center;width:20px;height:20px;flex:none;background:none;border:0;padding:0;border-radius:0}
+.match-sidebar .team-logo img{width:20px;height:20px;object-fit:contain}
+.match-sidebar .team-logo>span{font-size:7px;color:#8895b7}
+.feed-team-name{font-size:11px;line-height:1.4;overflow-wrap:normal}
+.feed-team-price{text-align:right;font-size:10px;color:#acb6f4;font-variant-numeric:tabular-nums;font-weight:500}
+.feed-team-price.expired-price{color:#9a8c9c}
+.feed-odds-note{grid-column:1/-1;font-size:7px;letter-spacing:.35px;line-height:1.7;color:#7b829b}
+.match-feed-game{gap:8px}
+.match-feed-meta{max-width:52px;font-size:9px}
+.match-feed-teams{gap:8px}
+.feed-decision-reason{grid-column:1/-1;font-size:9px;line-height:1.6;color:#848ba0;margin-top:0;overflow-wrap:anywhere}
+.feed-bar>.saved-data-actions>span{line-height:1.8}
+@media(max-width:760px){.match-feed-teams>.feed-team{grid-template-columns:24px minmax(0,1fr) 43px 15px;gap:7px}.match-sidebar .team-logo,.match-sidebar .team-logo img{width:24px;height:24px}.feed-team-name{font-size:12px}.feed-team-price{font-size:11px}.feed-odds-note{font-size:8px}}

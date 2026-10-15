@@ -9,8 +9,8 @@ const share=(v:string|undefined)=>v!==undefined&&Number.isFinite(Number(v))?`${(
 export default function NHLStatistics({data}:{data:Statistics|null|undefined}){
   const [selected,setSelected]=useState<Record<string,string>>({});
   if(!data)return null;
-  if(!data.sides)return <section className="nhl-statistics" aria-label="NHL matchup statistics"><h3>NHL matchup statistics</h3><p className="muted">{data.message||'Statistics are awaiting verification.'}</p></section>;
-  return <section className="nhl-statistics" aria-label="NHL matchup statistics"><div className="nhl-statistics-heading"><h3>NHL matchup statistics</h3><span className={`badge ${data.status==='stale'?'hold':'watch'}`}>{data.status==='stale'?'LAST VALID DATA':'GAME HISTORY'}</span></div><p className="nhl-statistics-source">Games through {data.verified_through} · Retrieved {data.observed_at?pacificTime(data.observed_at)+' PT':'—'}</p>{data.status==='stale'&&<p className="notice" role="status">These statistics need a newer import. The last valid values are retained.</p>}
+  if(!data.sides)return <section className="nhl-statistics" aria-label="NHL Matchup Statistics"><h3>NHL Matchup Statistics</h3><p className="muted">{data.message||'Statistics are awaiting verification.'}</p></section>;
+  return <section className="nhl-statistics" aria-label="NHL Matchup Statistics"><div className="nhl-statistics-heading"><h3>NHL Matchup Statistics</h3><span className={`badge ${data.status==='stale'?'hold':'watch'}`}>{data.status==='stale'?'LAST VALID DATA':'GAME HISTORY'}</span></div><p className="nhl-statistics-source">Games through {data.verified_through} · Retrieved {data.observed_at?pacificTime(data.observed_at)+' PT':'—'}</p>{data.status==='stale'&&<p className="notice" role="status">These statistics need a newer import. The last valid values are retained.</p>}
   <div className="nhl-team-comparison">{(['away','home'] as const).map(side=>{
     const team=data.sides![side],metrics=team.metrics,goalies=team.goalies||[];
     const goalie=goalies.find(g=>g.player_id===selected[side]);
