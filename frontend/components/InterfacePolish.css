@@ -1,5 +1,5 @@
 /* Use the established theme for section headings; team names stay legible. */
-:is(.page-heading h1,.daily-heading h2,.market-heading h2,.card-heading h2,.section-heading h2,.match-sidebar-heading h2,.nhl-statistics h3,.drawer h3,.wager-modal h2,.login-card h1,.table-empty h3){background:linear-gradient(110deg,#4ac8ff 0%,#6195ff 45%,#a678ff 95%);background-clip:text;-webkit-background-clip:text;color:transparent}
+:is(.page-heading h1,.daily-heading h2,.market-heading h2,.card-heading h2,.section-heading h2,.match-sidebar-heading h2,.nhl-statistics h3,.drawer h3,.wager-modal h2,.login-card h1,.table-empty h3,.empty-shortlist h3){background:linear-gradient(110deg,#4ac8ff 0%,#6195ff 45%,#a678ff 95%);background-clip:text;-webkit-background-clip:text;color:transparent}
 .page-heading h1,.daily-heading h2{width:fit-content;max-width:100%}
 .match-feed-teams>.feed-team{display:grid;grid-template-columns:20px minmax(0,1fr) 35px 12px;align-items:center;gap:5px;min-height:25px}
 .match-sidebar .team-logo{display:flex;align-items:center;justify-content:center;width:20px;height:20px;flex:none;background:none;border:0;padding:0;border-radius:0}

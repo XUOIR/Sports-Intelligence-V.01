@@ -44,3 +44,13 @@ The full isolated backend suite passed 214 checks, and the additional strength-w
 At 7:22:59 PM Pacific, free provider metadata reported Odds API 9 used / 491 remaining, and OpenRouter US$0 daily/monthly/all-time usage, US$3 remaining with monthly reset and US$10 wallet balance. No AI generation or metered odds refresh was performed. A live database read independently showed zero AI admissions and three odds request records. Existing caps, latches, manual-refresh policy, secrets and login remain unchanged.
 
 Live rollout evidence is appended after deployment verification.
+
+## Live release and free score recovery
+
+Backend `dep-db83j0rncjis73eg3vbg` deployed commit `8de0c450ad008c4f0eb0010234eb0153946a3103` at 7:25:07 PM Pacific and became live at 7:25:47 PM. Frontend `dep-db83jsgm7kps73ctqitg` first deployed the same commit at 7:26:58 PM and became live at 7:28:00 PM. Readiness returned 200; anonymous backend/proxy reads returned 401 and Bankroll/Model Performance redirected to login.
+
+The live official logos all loaded and saved PlayNow prices appeared beside the sidebar team names. Model Performance independently showed zero saved/resolved forecasts and unavailable accuracy/Brier, with the corrected gradient title. The live header explicitly identified the 3:13 PM saved prices as expired.
+
+At 7:25:37 PM the shared score feed rejected a transient response and entered its existing fifteen-minute free-provider cooldown, retaining the last valid scores. The original offending body was not retained, so its exact schema difference is unknown. One diagnostic request was atomically reserved against the existing 1,500/day free limit and audited before fetching; its 14,080-byte response passed the unchanged parser (Washington 5–Montréal 4 final, Colorado–Dallas live). The specific free-feed circuit was resumed once, with its budget unchanged and an audit entry. The worker subsequently saved a fresh official score response at 7:31:16 PM; the free count was 586, including the diagnostic. No paid odds/AI circuit or budget was reset, and no parser validation was weakened.
+
+A final consistency pass also capitalized Advanced Statistics and the empty-state headings. Its frontend-only rollout is recorded below after verification.
