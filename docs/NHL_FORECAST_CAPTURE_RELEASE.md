@@ -28,4 +28,10 @@ Disposable browser QA confirmed projected/unknown names, candidate appearance/re
 
 No paid odds refresh, AI generation, provider trial, subscription, additional MoneyPuck import or new API was used. Existing durable limits, failure cooldowns, five manual odds attempts per rolling 24 hours and the US$3 monthly AI cap remain unchanged. The existing daily advanced-statistics import retains its bandwidth/admission limits. The currently cached advanced dataset predates the added strength/venue fields; they will arrive through the next ordinary admitted daily import, with no forced extra download.
 
-Live deployment verification and screenshot paths are appended after rollout.
+## Live rollout
+
+Code commit `20a746a177850a522e1de7b9726ab1b3ac09c5e1` was pushed to the active repository's main branch. Backend deploy `dep-db871e3ncjis73esm8m0` became live at 23:21:16 Pacific; its liveness and database readiness endpoints returned 200 and anonymous dashboard access returned 401. Frontend deploy `dep-db87212vcj2c738fb9fg` became live at 23:23:03 Pacific. Both releases were independently verified through Render's deployment records. Existing paid instances, Blueprint, secrets, subscriptions and schedules were preserved.
+
+The saved dashboard session expired during the final live browser check. Reload correctly returned to the login page. User sign-in was requested to finish inspecting the new private panels; disposable browser QA is distinct from a completed authenticated production visual check. The latest source inventory and all validation blockers remain as documented above.
+
+Anonymous Model Performance and Bankroll requests redirect to login, and the frontend data proxy returns 401. The post-deploy database audit still reports six raw snapshots, zero baseline/calibrated forecasts, zero approved models, zero AI generations, three odds attempts and one daily MoneyPuck batch. No test confirmation or synthetic model approval entered production. The final live frontend deployment screenshot is `C:/Users/FSOS/.codex/visualizations/2026/10/13/01a136cb-e7b1-71b1-b3d0-ff203648a6df/nhl-forecast-deployment-live.png`; it proves deployment status, not an authenticated inspection of the new goalie panel. Disposable servers and deployment tabs were closed, and the viewport override was reset.
