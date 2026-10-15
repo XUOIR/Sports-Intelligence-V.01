@@ -1,0 +1,2 @@
+# Optional offline research only; production requirements remain unchanged.
+numpy==2.3.5
