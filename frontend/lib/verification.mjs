@@ -5,6 +5,12 @@ export function verificationExpired(detail,now=Date.now()){
   return !data||isStale(data.checked_at,now)||Date.parse(detail.fixture.commence_time)<=now
     ||data.phase==='waiting_for_anchor'&&Date.parse(data.anchor_at)<=now;
 }
+export function verificationNotice(detail,now=Date.now()){
+  if(Date.parse(detail.fixture.commence_time)<=now)return 'Pregame verification is closed for this game. Refreshing saved evidence cannot reopen it.';
+  if(!verificationExpired(detail,now))return null;
+  if(detail.verification?.phase==='waiting_for_anchor'&&Date.parse(detail.verification.anchor_at)<=now)return 'The T−30 checkpoint has arrived. Refresh saved evidence to read the captured inputs; missing pregame evidence cannot be added retrospectively.';
+  return 'This panel needs a newer database read. Refresh saved evidence to see current verification.';
+}
 export function gateStatus(check,detail,now=Date.now()){
   if(check.status!=='passed')return check.status;
   if(verificationExpired(detail,now)||detail.fixture.dirty)return 'blocked';
