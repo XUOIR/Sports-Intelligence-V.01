@@ -7,9 +7,24 @@ os.environ["ENABLE_SCHEDULER"] = "false"
 os.environ["ADMIN_API_TOKEN"] = "test-session-token-32-characters-long"
 
 import pytest_asyncio
+import pytest
+from datetime import datetime, timezone, timedelta
+import time
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from app import db
 from app.models import Base, Account
+
+@pytest.fixture(autouse=True)
+def fixed_test_clock(monkeypatch):
+    # Date-scoped feed assertions must not depend on running before 10 PM.
+    from app import clock
+    began=time.monotonic()
+    class TestDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            value=datetime(2026,10,14,19,0,tzinfo=timezone.utc)+timedelta(seconds=time.monotonic()-began)
+            return value.astimezone(tz) if tz else value.replace(tzinfo=None)
+    monkeypatch.setattr(clock,'datetime',TestDatetime)
 
 @pytest_asyncio.fixture
 async def database():

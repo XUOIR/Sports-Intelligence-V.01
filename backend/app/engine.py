@@ -14,7 +14,7 @@ from .providers import doublecheck
 from .http import ProviderError
 from .limits import limits, BudgetExceeded
 from .config import settings
-from .readiness import validated_model
+from .readiness import validated_model, matching_nhl_starters
 from .nhl_advanced import frozen_context
 from .nhl_history import HISTORY_CONTRACT
 from .verification import price_pair, current_timestamp
@@ -85,11 +85,24 @@ async def freeze(fixture_id: str):
         if collected>anchor+timedelta(seconds=5):
             fixture.state,fixture.reason=State.HOLD,"Anchor processing deadline exceeded; no late snapshot"
             return
+        factors=factor_source.payload if factor_source else {}
+        provenance={"source_at":aware(factor_source.source_at).isoformat(),"observed_at":aware(factor_source.observed_at).isoformat(),"payload":factors} if factor_source else None
+        if fixture.sport=='NHL':
+            # The NHL contract is deterministic. Operator-entered arbitrary
+            # normalized numbers cannot validate or supply the production model.
+            p,factors,provenance=None,{},None
+            if research and research.get('factors'):
+                factors=research['factors']
+                p=baseline('NHL',factors)
+                observed=max(aware(advanced_context['cache_observed_at']),aware(research['starter_evidence']['observed_at']))
+                provenance={'mode':'derived','contract':research['contract'],'source_at':observed.isoformat(),
+                    'observed_at':observed.isoformat(),'computed_at':collected.isoformat(),'payload':factors}
+            else:
+                fixture.state,fixture.reason=State.HOLD,(research or {}).get('reason','Current advanced statistics are missing at T−30')
         session.add(Snapshot(fixture_id=fixture_id, anchor_at=anchor, collected_at=collected, game_date=aware(fixture.commence_time).date(), vector=vector,
-            evidence_ids=[r.id for r in selected.values()]+([factor_source.id] if factor_source else []), baseline_home_probability=p, model_version=MODEL_VERSION,
+            evidence_ids=[r.id for r in selected.values()]+([factor_source.id] if factor_source and fixture.sport!='NHL' else [])+([starter.id] if advanced_context and starter else []), baseline_home_probability=p, model_version=MODEL_VERSION,
             context={"sources": {k:{"source_at":aware(r.source_at).isoformat(),"observed_at":aware(r.observed_at).isoformat(),"payload":r.payload} for k,r in selected.items()},
-                "factors":factor_source.payload if factor_source else {},
-                "factor_source":{"source_at":aware(factor_source.source_at).isoformat(),"observed_at":aware(factor_source.observed_at).isoformat(),"payload":factor_source.payload} if factor_source else None,
+                "factors":factors,"factor_source":provenance,'baseline_digest':baseline_digest(fixture.sport),
                 "nhl_statistics":advanced_context,"research_factors":research}))
         fixture.dirty = True
 
@@ -133,11 +146,18 @@ async def evaluate(fixture_id: str):
         model = await session.scalar(select(ModelValidation).where(ModelValidation.sport == fixture.sport,
             ModelValidation.approved.is_(True)).order_by(ModelValidation.created_at.desc()).limit(1))
         probability_ok = validated_model(model,snapshot)
+        if fixture.sport=='NHL':
+            probability_ok=probability_ok and matching_nhl_starters(snapshot,metrics)
         p_home = calibrated(snapshot.baseline_home_probability, model.parameters) if probability_ok else None
         if p_home is not None:
-            snapshot.prediction_home_probability = p_home
+            if snapshot.prediction_home_probability is None:
+                snapshot.prediction_home_probability = p_home
+                snapshot.context={**snapshot.context,'forecast_model_version':model.version,'forecast_saved_at':now().isoformat()}
+            elif snapshot.prediction_home_probability!=p_home or snapshot.context.get('forecast_model_version')!=model.version:
+                probability_ok=False
+                p_home=None
         choices = [(q, p_home if q.selection == fixture.home else 1-p_home) for q in complete] if p_home is not None else []
-        chosen = max(choices, key=lambda pair: pair[1]-pair[0].implied_probability) if choices else None
+        chosen = max(choices, key=lambda pair: pair[1]-1/pair[0].decimal_odds) if choices else None
         account = await session.get(Account, 1)
         net = await session.scalar(select(func.coalesce(func.sum(PersonalBet.profit_cad),0)))
         exposure = await session.scalar(select(func.coalesce(func.sum(PersonalBet.stake_cad),0)).where(PersonalBet.outcome == Outcome.PENDING))
@@ -153,7 +173,7 @@ async def evaluate(fixture_id: str):
         suggested = Decimal(0)
         if chosen:
             quote, p = chosen
-            edge = p-quote.implied_probability
+            edge = p-1/quote.decimal_odds
             gates["price"] = edge >= MIN_EDGE
             available = min(bankroll-exposure, bankroll*MAX_OPEN_EXPOSURE-exposure)
             suggested = stake(p, quote.decimal_odds, bankroll, available)

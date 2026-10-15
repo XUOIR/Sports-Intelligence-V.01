@@ -57,6 +57,7 @@ async def reschedule(session, fixture, start):
     await session.flush()
 
 async def ingest_nhl_personnel():
+    from .nhl_starters import comparison
     async with db.Session() as session:
         fixtures=(await session.scalars(select(Fixture).where(Fixture.id.like("nhl:%"),Fixture.commence_time>now(),
             Fixture.commence_time<now()+timedelta(hours=2)).limit(6))).all()
@@ -65,6 +66,9 @@ async def ingest_nhl_personnel():
         confirmations=providers.goalie_confirmation(payload)
         async with db.Session.begin() as session:
             current=await session.get(Fixture,fixture.id,with_for_update=True)
+            candidates=comparison(payload,current,now())
+            if candidates:
+                current.metrics={**current.metrics,'nhl_goalie_comparison':candidates}
             if all(confirmations.values()):
                 current.metrics={**current.metrics,"personnel_confirmed":True,"confirmed_at":now().isoformat(),"goalie_confirmations":confirmations}
                 dirty(current,"Official starter confirmations changed")

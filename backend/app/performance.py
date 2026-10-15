@@ -69,7 +69,7 @@ async def model_stats(session,sport):
         predictions.append({'fixture_id':fixture.id,'home':fixture.home,'away':fixture.away,
             'selection':'Even match' if probability==Decimal('.5') else fixture.home if picked_home else fixture.away,
             'probability':str(probability if picked_home else 1-probability),
-            'anchor_at':aware(snapshot.anchor_at),'model_version':snapshot.model_version,
+            'anchor_at':aware(snapshot.anchor_at),'model_version':snapshot.context.get('forecast_model_version',snapshot.model_version),
             'result':None if snapshot.final_home_win is None else 'NO DIRECTION' if probability==Decimal('.5') else 'CORRECT' if picked_home==snapshot.final_home_win else 'INCORRECT'})
     return {'sport':sport,'model':{**recorded['model'],'predicted':int(total or 0),
         'pending':int(total or 0)-recorded['model']['evaluated']},'predictions':predictions,

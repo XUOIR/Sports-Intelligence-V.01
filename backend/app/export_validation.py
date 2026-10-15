@@ -20,7 +20,9 @@ async def main():
             'anchor_at':aware(s.anchor_at).isoformat(),'collected_at':aware(s.collected_at).isoformat(),
             'vector':s.vector,'model_version':s.model_version,'probability':str(s.baseline_home_probability),
             'outcome':int(s.final_home_win),'sources':s.context.get('sources',{}),'factors':s.context.get('factors',{}),
-            'factor_source':s.context.get('factor_source'),'result_source':s.context.get('result_source')} for s,f in rows]
+            'factor_source':s.context.get('factor_source'),'result_source':s.context.get('result_source'),
+            'baseline_digest':s.context.get('baseline_digest'),'nhl_statistics':s.context.get('nhl_statistics'),
+            'starter_evidence':(s.context.get('research_factors') or {}).get('starter_evidence')} for s,f in rows]
     args.output.write_text(json.dumps(records,separators=(',',':')),encoding='utf-8')
     await db.engine.dispose()
     print(f'Exported {len(records)} outcome-labeled snapshots')

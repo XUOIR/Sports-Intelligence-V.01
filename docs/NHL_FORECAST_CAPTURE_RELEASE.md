@@ -1,0 +1,31 @@
+# NHL forecast capture and starter workflow
+
+October 14, 2026, Pacific time. Only the active Sports-Intelligence-V.01 repository is involved.
+
+## Implemented behavior
+
+- At the existing exact T−30 checkpoint, NHL baseline inputs are now derived from saved, genuinely pre-anchor MoneyPuck statistics, source-backed starter confirmations and official form/rest. The versioned normalization is `nhl-normalized-factors-v2`; its digest is part of model compatibility. An arbitrary operator-entered factor vector cannot substitute for these facts. The baseline remains uncalibrated and cannot appear as an approved forecast, edge, stake or verified play by itself.
+- Snapshots retain normalized factors, underlying statistics, starter evidence IDs, actual source observations and the derivation time. Validation exports carry those facts. The offline validator reconstructs normalization and probability and rejects tampering, incompatible contracts and missing evidence. Existing 300/100/100 chronological partition minimums, embargoes and reference-beating Brier requirement remain unchanged.
+- Current confirmed goalie names must agree with the frozen pair before that snapshot can drive a calibrated probability. The first saved forecast and its calibration version/time are retained; a changed pairing or calibration cannot silently overwrite it. Edge calculations now use the exact reciprocal of the matching decimal price, matching the dashboard calculation, instead of its rounded stored implied probability.
+- The existing admitted NHL landing requests retain a small identified goalie comparison for previews; no provider call, polling frequency, key or subscription was added. A conservative workload/rest heuristic labels a candidate Projected Starter only when recent comparison/history can distinguish one; otherwise Starter Unknown is explicit. Season appearances include relief appearances. Comparison lists do not establish active roster/health eligibility, and the heuristic has no claimed accuracy or numeric starting probability. It never supplies the confirmed-starter gate or model factors.
+- Match details show Starting Goalies with named confirmation/source/recheck information separately from historical goalie statistics. Confirmed/projected badges expire in an open panel. The form stores an optional original report publication time independently from an actual recent recheck, preserving an earlier morning report's real date. Future publication times and retrospective evidence submission remain rejected. Manual research factor entry is retained and clearly distinguished from automatic NHL inputs.
+
+No database schema migration is needed. Existing protected routes, login, theme, Bankroll settlement and separate model results remain. Historical comparisons do not approve a model; prices still expire after five minutes and cannot become current through a cache read.
+
+## Actual source and production audit
+
+The production read at the start of this work found 41 NHL fixtures, six snapshots, zero snapshots with a baseline probability, zero saved calibrated forecasts, zero approved models, no starter evidence and no AI request records. Three prior odds request records existed. Existing live releases were backend `8de0c45` and frontend `edcb165` before this rollout.
+
+The new bounded, offline-only `app.nhl_corpus` audit read the already-downloaded 127,056,736-byte team file (SHA256 `78ebaf1ab1b51fbb734978001d0ee1101de2c3703836a201af82765c99de9483`) and 48,168-byte goalie ZIP (SHA256 `08521e87b92a5e64f755c63f913718e010f7fe60118fc5f71ebc75832ce31eda`). It found 233,270 team rows, 1,115 goalie rows and 105 paired current-season regular-season games with matching goalie coverage, through October 13. Only 20 have five prior games for both teams. Older team seasons are inventoried, not represented as audited matching goalie archives or original pregame observations. No network, database, model approval or probability generation occurs in this audit.
+
+These files do not establish historical pregame starter confirmations or original pregame source versions. They cannot be backdated into a passing genuine validation corpus. The normalized capture path is ready for future qualified checkpoints; the current model is still unapproved. Historical research and genuine forward forecasts remain separate.
+
+## Verification and spending
+
+The isolated backend suite passed 220 checks, including normalized capture → saved calibrated forecast → price expiry → observed final result → reproducible validation export, with synthetic approvals and mocked providers only. Regression checks cover changed goalies/calibration retaining the first forecast, preserved report times, and no provider requests from match reads. The frontend passed 22 checks, including stale starter badges, signed edge and quote freshness. Production compilation and type checking passed. Backend test dates now use a progressing midday clock so date-scoped tests do not fail merely because the test run crosses midnight.
+
+Disposable browser QA confirmed projected/unknown names, candidate appearance/rest context, the source/recheck form, and saved confirmations without granting gates. An intentionally fictional matchup and isolated database were used; none of those confirmations entered production. Browser console errors were absent.
+
+No paid odds refresh, AI generation, provider trial, subscription, additional MoneyPuck import or new API was used. Existing durable limits, failure cooldowns, five manual odds attempts per rolling 24 hours and the US$3 monthly AI cap remain unchanged. The existing daily advanced-statistics import retains its bandwidth/admission limits. The currently cached advanced dataset predates the added strength/venue fields; they will arrive through the next ordinary admitted daily import, with no forced extra download.
+
+Live deployment verification and screenshot paths are appended after rollout.

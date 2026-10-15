@@ -20,7 +20,7 @@ async def test_exact_anchor_freezes_only_pre_cutoff_evidence(database,monkeypatc
     await freeze('nhl:freeze')
     async with database() as session:
         snapshot=await session.get(Snapshot,'nhl:freeze')
-        assert snapshot and len(snapshot.vector)==15 and snapshot.baseline_home_probability==Decimal('.5')
+        assert snapshot and len(snapshot.vector)==15 and snapshot.baseline_home_probability is None
         assert len(snapshot.context['sources'])==3
         original=snapshot.vector
     await freeze('nhl:freeze')
@@ -41,11 +41,11 @@ async def seed_recommendation(database):
     current=now();start=current+timedelta(minutes=20);anchor=start-timedelta(minutes=30)
     async with database.begin() as session:
         session.add(Fixture(id='nhl:recommend',sport='NHL',home='Home',away='Away',commence_time=start,metrics={
-            'personnel_confirmed':True,'confirmed_at':current.isoformat(),'other_markets_verified':True,'opposing_case_verified':True,
+            'personnel_confirmed':True,'confirmed_at':current.isoformat(),'goalie_confirmations':{'home':'Home Starter','away':'Away Starter'},'other_markets_verified':True,'opposing_case_verified':True,
             'execution_source_present':True,'execution_verified_at':current.isoformat()},revision=1))
         await session.flush()
         session.add(Snapshot(fixture_id='nhl:recommend',anchor_at=anchor,collected_at=anchor+timedelta(seconds=1),game_date=start.date(),
-            vector=[.5,.5,0,10,10,.5,.5,0,5,5,1,1,0,0,0],evidence_ids=[],model_version=MODEL_VERSION,baseline_home_probability=Decimal('.7')))
+            vector=[.5,.5,0,10,10,.5,.5,0,5,5,1,1,0,0,0],evidence_ids=[],model_version=MODEL_VERSION,baseline_home_probability=Decimal('.7'),context={'baseline_digest':baseline_digest('NHL'),'research_factors':{'starter_evidence':{'payload':{'home':'Home Starter','away':'Away Starter'}}}}))
         session.add(ModelValidation(version='approved',sport='NHL',parameters={'slope':1,'intercept':0},approved=True,
             created_at=current-timedelta(days=1),report={'baseline_version':MODEL_VERSION,'baseline_digest':baseline_digest('NHL'),
                 'passing':True,'train_records':300,'calibration_records':100,'test_records':100,'test_brier':'.19','reference_brier':'.25',

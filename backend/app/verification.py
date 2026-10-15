@@ -5,7 +5,7 @@ from .clock import now, aware
 from .features import SOURCE_MAX_AGE, frozen_vector
 from .models import Evidence, ModelValidation
 from .model_config import MIN_EDGE
-from .readiness import validated_model
+from .readiness import validated_model, matching_nhl_starters
 from .nhl_history import HISTORY_CONTRACT
 
 
@@ -78,6 +78,12 @@ async def detail(session, fixture, snapshot, quotes, statistics):
     model = await session.scalar(select(ModelValidation).where(ModelValidation.sport == 'NHL', ModelValidation.approved.is_(True))
         .order_by(ModelValidation.created_at.desc()).limit(1))
     model_ok = validated_model(model, snapshot) if snapshot_ok else validated_model(model)
+    starter_pair_ok=matching_nhl_starters(snapshot,metrics) if snapshot_ok else True
+    model_ok=model_ok and starter_pair_ok
+    inputs.append({'key':'normalized_factors','label':'Reproducible forecast inputs',
+        'status':'available' if snapshot_ok and snapshot.baseline_home_probability is not None else 'pending' if pending_anchor else 'missing',
+        'source':'Frozen NHL statistics and confirmed starters',
+        'observed_at':aware(snapshot.collected_at).isoformat() if snapshot_ok else None})
     active = start > at
     def check(key, label, message, valid=True):
         passed = active and not fixture.dirty and snapshot_ok and valid and fixture.gates.get(key) is True
@@ -101,6 +107,7 @@ async def detail(session, fixture, snapshot, quotes, statistics):
                     'The engine checks duplicate tickets, open exposure and stake size after a price and forecast are available.'),
               check('probability', 'Validated model probability',
                     'Compatible model validation is available.' if model_ok else
+                    'The confirmed goalie pairing differs from, or is absent in, the frozen inputs.' if not starter_pair_ok else
                     'No compatible approved NHL model. Raw xG and market-implied odds do not establish a forecast.', model_ok)]
     message = ('Checks run at T−30. Available statistics below do not grant a verified play.' if pending_anchor else
                'The T−30 inputs are frozen. Prices, starters and reviews still need current verification.' if snapshot_ok and active else

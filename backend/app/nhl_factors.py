@@ -1,4 +1,4 @@
-"""Reproducible research inputs, never an approved forecast or a gate grant.
+"""Reproducible frozen inputs, never a calibrated forecast or a gate grant.
 
 Versioned scales are fixed before evaluation, not tuned to current outcomes.
 Missing facts fail closed. No network, database, fallback or zero imputation.
@@ -9,7 +9,7 @@ import unicodedata
 from .clock import aware
 from .maths import decimal
 
-CONTRACT='nhl-factor-research-v1'
+CONTRACT='nhl-normalized-factors-v2'
 
 
 def clip(value):return max(Decimal(-1),min(Decimal(1),value))
@@ -28,6 +28,9 @@ def normalized_factors(context, starters, form, anchor):
             or not at-timedelta(minutes=30)<=aware(starters['source_at'])<=aware(starters['observed_at'])<=at
             or not starters['payload'].get('source_url','').startswith('https://')):
         raise ValueError('Both confirmed starters require current pre-anchor evidence')
+    published=starters['payload'].get('reported_at')
+    if published and not aware(published)<=aware(starters['source_at']):
+        raise ValueError('Starter report must precede its actual re-verification')
 
     def name(value):
         return ' '.join(unicodedata.normalize('NFKC',str(value)).casefold().split())
@@ -65,6 +68,6 @@ def normalized_factors(context, starters, form, anchor):
         'expected_goals':clip((h['xg']-a['xg'])/Decimal('.20')),
         'rest_fatigue':clip(Decimal(h['rest']-a['rest'])/3),
         'venue_special_teams':(venue+special)/2}
-    return {'contract':CONTRACT,'classification':'research_inputs_only',
+    return {'contract':CONTRACT,'classification':'normalized_inputs_not_validated_prediction',
         'factors':{k:str(v) for k,v in factors.items()},'raw':{s:{k:str(v) for k,v in row.items()} for s,row in values.items()},
         'starter_evidence':starters,'approved_for_prediction':False}

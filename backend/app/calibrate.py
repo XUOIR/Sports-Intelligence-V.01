@@ -14,6 +14,7 @@ from .maths import baseline
 from .features import validate_source,frozen_vector
 from .validation import chronological_split, fit_platt, brier
 from .nhl_history import HISTORY_CONTRACT
+from .nhl_factors import normalized_factors, CONTRACT
 
 def validate(records):
     ids = set()
@@ -44,6 +45,16 @@ def validate(records):
                     raise ValueError()
             except (KeyError,TypeError,ValueError):
                 raise ValueError('NHL factors require genuine pre-anchor source provenance') from None
+            try:
+                vector=r['vector']
+                form={side:{'days_rest':vector[index]} for side,index in (('home',10),('away',11))}
+                normalized=normalized_factors(r['nhl_statistics'],r['starter_evidence'],form,anchor)
+                if (r.get('baseline_digest')!=baseline_digest('NHL') or factor_source.get('mode')!='derived'
+                        or factor_source.get('contract')!=CONTRACT or normalized['factors']!=r['factors']
+                        or not anchor<=aware(factor_source['computed_at'])<=anchor+timedelta(seconds=5)):
+                    raise ValueError()
+            except (KeyError,TypeError,ValueError,AttributeError):
+                raise ValueError('NHL normalization must reproduce the current contract from frozen facts') from None
             try:
                 result=r['result_source']
                 h,a=result['home_score'],result['away_score']

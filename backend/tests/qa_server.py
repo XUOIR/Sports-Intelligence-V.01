@@ -73,6 +73,13 @@ async def lifespan(application):
                 commence_time=now()+timedelta(hours=3),state=State.HOLD,
                 reason='Local statistics test: illustrative matchup, not an official scheduled game.',
                 metrics={'home_abbrev':'EDM','away_abbrev':'TOR'},gates={}))
+            if os.getenv('QA_NHL_STARTERS')=='true':
+                await session.flush()
+                fixture=await session.get(Fixture,'qa:nhl-stats')
+                fixture.metrics={**fixture.metrics,'nhl_goalie_comparison':{'observed_at':now().isoformat(),
+                    'sides':{side:[{'player_id':g['player_id'],'name':g['name'],'season_appearances':g['sample_games']}
+                        for g in sorted(batch['goalies'].values(),key=lambda g:g['sample_games'],reverse=True) if g['latest_team']==code][:2]
+                        for side,code in [('home','EDM'),('away','TOR')]}}}
             if os.getenv('QA_DAILY_GRID')=='true':
                 # Ten disposable cards test busy-slate density and lazy logos.
                 for index in range(9):

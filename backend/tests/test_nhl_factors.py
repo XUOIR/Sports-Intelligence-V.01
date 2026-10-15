@@ -29,7 +29,7 @@ def inputs():
 def test_equal_evidence_produces_neutral_research_inputs_not_a_prediction():
     result=normalized_factors(*inputs())
     assert all(Decimal(value)==0 for value in result['factors'].values())
-    assert result['approved_for_prediction'] is False and result['classification']=='research_inputs_only'
+    assert result['approved_for_prediction'] is False and result['classification']=='normalized_inputs_not_validated_prediction'
     assert 'probability' not in result
 
 

@@ -5,6 +5,14 @@ from .clock import now, aware
 from .model_config import MODEL_VERSION, baseline_digest
 from .maths import decimal
 
+def matching_nhl_starters(snapshot,metrics):
+    if snapshot is None:return False
+    frozen=(snapshot.context.get('research_factors') or {}).get('starter_evidence',{}).get('payload',{})
+    current=metrics.get('goalie_confirmations',{})
+    return all(isinstance(frozen.get(side),str) and bool(frozen[side].strip())
+        and frozen[side].strip().casefold()==str(current.get(side,'')).strip().casefold()
+        for side in ('home','away'))
+
 def fresh_recommendation(fixture):
     try:
         metrics=fixture.metrics
@@ -28,6 +36,7 @@ def validated_model(model,snapshot=None):
         if not timedelta(0)<=now()-aware(model.created_at)<=timedelta(days=90):return False
         if snapshot is not None:
             return (snapshot.model_version==MODEL_VERSION and snapshot.baseline_home_probability is not None
+                and (model.sport!='NHL' or snapshot.context.get('baseline_digest')==baseline_digest('NHL'))
                 and aware(model.created_at)<=aware(snapshot.anchor_at)
                 and aware(report['test_through']).date()<snapshot.game_date)
         return aware(report['test_through'])<aware(model.created_at)

@@ -13,6 +13,8 @@ from app import engine,ingestion
 from app.ingestion import quote_identity
 from app.verification import price_pair
 from app.calibrate import validate
+from app.nhl_advanced import CACHE_KEY
+from test_nhl_factors import inputs
 
 
 async def seed(database,at):
@@ -22,7 +24,7 @@ async def seed(database,at):
     factors={key:.2 for key in ('goalie_personnel','expected_goals','rest_fatigue','venue_special_teams')}
     async with database.begin() as session:
         session.add(Fixture(id='nhl:2026020900',sport='NHL',home='Home',away='Away',commence_time=start,metrics={
-            'nhl_season':20262027,'personnel_confirmed':True,'confirmed_at':observed.isoformat(),
+            'nhl_season':20262027,'home_abbrev':'TOR','away_abbrev':'EDM','goalie_confirmations':{'home':'Home Starter','away':'Away Starter'},'personnel_confirmed':True,'confirmed_at':observed.isoformat(),
             'other_markets_verified':True,'opposing_case_verified':True,'execution_source_present':True,'execution_verified_at':observed.isoformat()}))
         await session.flush()
         for kind,payload in [('schedule',{'start':start.isoformat()}),('standings',{'home':{'games':6,'points_pct':.5},'away':{'games':6,'points_pct':.5}}),
@@ -38,6 +40,20 @@ async def seed(database,at):
 
 async def test_freeze_forecast_price_expiry_and_result_label_work_together(database,monkeypatch):
     at=now();await seed(database,at)
+    from dataclasses import replace
+    from app.config import settings
+    monkeypatch.setattr('app.nhl_advanced.settings',replace(settings,nhl_advanced_enabled=True))
+    context,starters,_,_=inputs()
+    context['teams']['home']['xg_share']='.62'
+    for i,g in enumerate(context['goalie_candidates']):g['player_id']=str(8480001+i)
+    batch={'schema_version':1,'model_approved_by_import':False,'as_of_date':str(at.date()),'verified_through':str(at.date()-timedelta(days=1)),
+        'sources':context['sources'],'teams':{r['team']:r for r in context['teams'].values()},
+        'team_context':{context['teams'][side]['team']:context['team_context'][side] for side in ('home','away')},
+        'goalies':{g['player_id']:g for g in context['goalie_candidates']}}
+    async with database.begin() as session:
+        session.add(ProviderState(provider=CACHE_KEY,observed_at=at-timedelta(minutes=2),info=batch))
+        session.add(Evidence(fixture_id='nhl:2026020900',kind='nhl_starters',source_at=at-timedelta(seconds=1),
+            observed_at=at-timedelta(seconds=1),payload=starters['payload']))
     monkeypatch.setattr(engine,'now',lambda:at+timedelta(seconds=1))
     monkeypatch.setattr('app.readiness.now',lambda:at+timedelta(seconds=1))
     await engine.freeze('nhl:2026020900')
@@ -78,7 +94,9 @@ async def test_freeze_forecast_price_expiry_and_result_label_work_together(datab
         assert s.final_home_win is True and s.brier is not None
         record={'fixture_id':f.id,'sport':f.sport,'model_version':s.model_version,'vector':s.vector,'factors':s.context['factors'],
             'factor_source':s.context['factor_source'],'result_source':s.context['result_source'],'sources':s.context['sources'],'commence_time':f.commence_time.isoformat(),
-            'anchor_at':s.anchor_at.isoformat(),'collected_at':s.collected_at.isoformat(),'probability':str(s.baseline_home_probability),'outcome':1}
+            'anchor_at':s.anchor_at.isoformat(),'collected_at':s.collected_at.isoformat(),'probability':str(s.baseline_home_probability),'outcome':1,
+            'baseline_digest':s.context['baseline_digest'],'nhl_statistics':s.context['nhl_statistics'],
+            'starter_evidence':s.context['research_factors']['starter_evidence']}
         validate([record])
         bad=deepcopy(record);bad['factor_source']['observed_at']=(at+timedelta(seconds=1)).isoformat()
         with pytest.raises(ValueError,match='provenance'):validate([bad])

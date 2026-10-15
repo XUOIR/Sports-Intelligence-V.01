@@ -242,8 +242,10 @@ async def fixture_detail(fixture_id: str, session=Depends(database)):
     quotes = (await session.scalars(select(MarketOdds).where(MarketOdds.fixture_id == fixture_id).order_by(MarketOdds.source_at.desc()).limit(100))).all()
     snapshot = await session.get(Snapshot,fixture_id)
     statistics = await nhl_advanced.detail(session,fixture)
+    from app.nhl_starters import preview
     return {"fixture":safe_fixture(fixture), "odds":[serialize(q) for q in quotes], "snapshot":serialize(snapshot) if snapshot else None,
-            "nhl_statistics":statistics, "verification":await verification.detail(session,fixture,snapshot,quotes,statistics)}
+            "nhl_statistics":statistics, "nhl_starters":preview(fixture,statistics) if fixture.sport=='NHL' else None,
+            "verification":await verification.detail(session,fixture,snapshot,quotes,statistics)}
 
 class WagerInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -334,6 +336,7 @@ class EvidenceInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
     source_at: datetime
     source_reference: str = Field(min_length=10,max_length=300)
+    starter_reported_at: datetime | None = None
     factors: dict[str, Decimal] | None = None
     personnel_confirmed: StrictBool
     other_markets_verified: StrictBool
@@ -361,6 +364,8 @@ async def verified_evidence(fixture_id: str, body: EvidenceInput, session=Depend
         source = aware(body.source_at)
         if not timedelta(0) <= now()-source <= timedelta(minutes=30):
             raise ValueError("Verification source must be <=30 minutes old")
+        if body.starter_reported_at and aware(body.starter_reported_at)>source:
+            raise ValueError('Original report publication must precede your recheck time')
     except ValueError as exc:
         raise HTTPException(422,str(exc)) from None
     async with session.begin():
@@ -388,12 +393,14 @@ async def verified_evidence(fixture_id: str, body: EvidenceInput, session=Depend
             # A later metrics edit cannot rewrite who was known at the anchor.
             session.add(Evidence(fixture_id=fixture_id,kind='nhl_starters',source_at=source,
                 observed_at=now(),payload={'confirmed':body.personnel_confirmed,
-                    'home':body.home_goalie,'away':body.away_goalie,'source_url':body.source_reference}))
+                    'home':body.home_goalie,'away':body.away_goalie,'source_url':body.source_reference,
+                    'reported_at':aware(body.starter_reported_at).isoformat() if body.starter_reported_at else None}))
         if body.factors is not None and now() < aware(fixture.commence_time)-timedelta(minutes=30):
             factors = {k:float(v) for k,v in body.factors.items()}
             session.add(Evidence(fixture_id=fixture_id,kind="model_factors",source_at=source,observed_at=now(),payload=factors))
         fixture.metrics = {**fixture.metrics, "factors":factors,"personnel_confirmed":body.personnel_confirmed,
             "confirmed_at":source.isoformat(), "roster_complete":roster_ok,
+            'starter_reported_at':aware(body.starter_reported_at).isoformat() if body.starter_reported_at else None,
             "goalie_confirmations":{'home':body.home_goalie,'away':body.away_goalie} if fixture.sport=='NHL' else fixture.metrics.get('goalie_confirmations',{}),
             "other_markets_verified":body.other_markets_verified,"opposing_case_verified":body.opposing_case_verified,
             "maps_veto_verified":body.maps_veto_verified,"source_reference":body.source_reference}
