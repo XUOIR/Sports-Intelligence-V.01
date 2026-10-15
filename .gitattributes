@@ -1,2 +1,3 @@
 # Keep frozen research source hashes stable across Windows checkouts.
 backend/research/** text eol=lf
+backend/app/data/** text eol=lf

@@ -1,0 +1,17 @@
+.paper-research>.fine-print,.paper-research>.notice{margin:16px 24px;line-height:1.8}
+.with-match-feed .paper-research>.metrics-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:18px 24px}
+.paper-research .metric-card{padding:16px;min-height:0}
+.paper-research .metric-label{font-size:8px;line-height:1.6;letter-spacing:.7px}
+.paper-research .metric-card strong{font-size:27px}
+.paper-research .metric-card p{font-size:10px;line-height:1.7}
+.paper-research table{min-width:0;width:100%;table-layout:fixed}
+.paper-research th,.paper-research td{padding:16px 10px;white-space:normal;overflow-wrap:anywhere;vertical-align:top;font-size:11px;line-height:1.7}
+.paper-research th{font-size:8px;letter-spacing:.6px}
+.paper-research td small{font-size:9px;line-height:1.8}
+.paper-research th:nth-child(1){width:24%}
+.paper-research th:nth-child(2){width:18%}
+.paper-research th:nth-child(3){width:22%}
+.paper-research th:nth-child(4){width:22%}
+.paper-research th:nth-child(5){width:14%}
+@media(max-width:1000px){.with-match-feed .paper-research>.metrics-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.paper-research table{min-width:650px}.paper-research>.fine-print,.paper-research>.notice{margin:14px 16px}.with-match-feed .paper-research>.metrics-grid{margin:14px 16px}.paper-research .market-heading{gap:10px;flex-wrap:wrap}}

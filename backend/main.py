@@ -157,7 +157,11 @@ async def dashboard(date:str|None=None,session=Depends(database)):
 @app.get('/performance',dependencies=[Depends(authorize)])
 async def sport_performance(sport:str='NHL',session=Depends(database)):
     if sport not in settings.active_sports:raise HTTPException(422,'Sport is not active')
-    return await model_stats(session,sport)
+    result = await model_stats(session,sport)
+    if sport == 'NHL':
+        from app.nhl_paper import summary
+        result['paper'] = await summary(session)
+    return result
 
 @app.get('/operations',dependencies=[Depends(authorize)])
 async def operations(session=Depends(database)):

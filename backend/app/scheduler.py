@@ -84,6 +84,7 @@ async def retain():
 
 def start():
     from .matches import tick as scores_tick
+    from .nhl_paper import cycle as paper_cycle
     scheduler.add_job(scores_tick,'interval',seconds=30,next_run_time=now(),id='nhl-scores')
     scheduler.add_job(guarded, CronTrigger(hour=4, minute=0, timezone=PACIFIC), args=["nhl-daily",daily_nhl,1800], id="nhl-daily")
     scheduler.add_job(guarded, "interval", hours=1, args=["nhl-refresh",refresh_nhl], id="nhl-refresh")
@@ -97,6 +98,10 @@ def start():
     scheduler.add_job(guarded, "interval", minutes=1, args=["nhl-preparation",prepare_anchors,55], id="nhl-preparation")
     scheduler.add_job(guarded, "interval", minutes=1, args=["gates",gates_cycle,55], id="gates")
     scheduler.add_job(guarded, "interval", hours=4, args=["results",ingest_results], id="results")
+    # Paper work reads saved odds only. One free complete-season refresh per day
+    # shares the existing NHL request cap; no AI or paid refresh is scheduled.
+    scheduler.add_job(guarded, "interval", minutes=1, next_run_time=now()+timedelta(seconds=20),
+                      args=['nhl-paper',paper_cycle,55], id='nhl-paper')
     scheduler.add_job(guarded, "interval", hours=48, args=["pulse",pulse], id="pulse")
     scheduler.add_job(guarded, "interval", days=1, args=["retention",retain], id="retention")
     scheduler.start()

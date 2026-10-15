@@ -181,3 +181,45 @@ class AuditLog(Base):
     entity_id: Mapped[str] = mapped_column(String(100))
     details: Mapped[dict] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(PacificTimestamp(), default=now)
+
+
+class PaperForecast(Base):
+    """Forward research only. No relation to Account or PersonalBet."""
+    __tablename__ = 'paper_forecasts'
+    id: Mapped[int] = mapped_column(primary_key=True)
+    fixture_id: Mapped[str] = mapped_column(ForeignKey('fixtures.id'), index=True)
+    model_version: Mapped[str] = mapped_column(String(40))
+    first_seen_at: Mapped[datetime] = mapped_column(PacificTimestamp(), default=now)
+    captured_at: Mapped[datetime | None] = mapped_column(PacificTimestamp())
+    start_at: Mapped[datetime] = mapped_column(PacificTimestamp())
+    home: Mapped[str] = mapped_column(String(160))
+    away: Mapped[str] = mapped_column(String(160))
+    home_probability: Mapped[Decimal | None] = mapped_column(Numeric(12,10))
+    inputs: Mapped[dict] = mapped_column(JSON, default=dict)
+    issue: Mapped[str | None] = mapped_column(String(500))
+    position: Mapped[dict | None] = mapped_column(JSON)
+    result_home_win: Mapped[bool | None] = mapped_column()
+    resolution: Mapped[str | None] = mapped_column(String(20))
+    settled_at: Mapped[datetime | None] = mapped_column(PacificTimestamp())
+    result_source: Mapped[dict | None] = mapped_column(JSON)
+    __table_args__ = (UniqueConstraint('fixture_id', 'model_version'),
+        CheckConstraint('home_probability IS NULL OR (home_probability > 0 AND home_probability < 1)'),
+        CheckConstraint('captured_at IS NULL OR captured_at < start_at'))
+
+
+class PaperPriceObservation(Base):
+    __tablename__ = 'paper_price_observations'
+    id: Mapped[int] = mapped_column(primary_key=True)
+    forecast_id: Mapped[int] = mapped_column(ForeignKey('paper_forecasts.id'), index=True)
+    identity: Mapped[str] = mapped_column(String(64))
+    observed_at: Mapped[datetime] = mapped_column(PacificTimestamp(), default=now)
+    status: Mapped[str] = mapped_column(String(40))
+    data: Mapped[dict] = mapped_column(JSON)
+    __table_args__ = (UniqueConstraint('forecast_id', 'identity'),)
+
+
+class PaperInputArchive(Base):
+    __tablename__ = 'paper_input_archives'
+    sha256: Mapped[str] = mapped_column(String(64), primary_key=True)
+    observed_at: Mapped[datetime] = mapped_column(PacificTimestamp(), default=now)
+    data: Mapped[dict] = mapped_column(JSON)

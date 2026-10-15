@@ -22,7 +22,9 @@ class SafeHTTP:
             hosts={'nhl':'api-web.nhle.com','nhl_scores':'api-web.nhle.com','odds':'api.the-odds-api.com','odds_meta':'api.the-odds-api.com',
                 'pandascore':'api.pandascore.co','pandascore_meta':'api.pandascore.co',
                 'openrouter':'openrouter.ai','openrouter_meta':'openrouter.ai','openrouter_wallet':'openrouter.ai'}
-            if provider not in hosts or target.scheme!='https' or target.host!=hosts[provider] or target.port not in (None,443) or target.userinfo:
+            paper_history = (provider == 'nhl' and target.host == 'api.nhle.com'
+                and target.path == '/stats/rest/en/game' and not target.query)
+            if provider not in hosts or target.scheme!='https' or (target.host!=hosts[provider] and not paper_history) or target.port not in (None,443) or target.userinfo:
                 raise ProviderError('Provider destination rejected')
             expected_method='POST' if provider=='openrouter' else 'GET'
             if method!=expected_method:raise ProviderError('Provider method rejected')

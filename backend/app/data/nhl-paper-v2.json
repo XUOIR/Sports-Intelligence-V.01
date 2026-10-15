@@ -1,0 +1,544 @@
+{
+  "contract": "nhl-team-paper-v2",
+  "mode": "paper_only",
+  "approved_for_wagers": false,
+  "created_at": "2026-10-15T23:37:44.314562+00:00",
+  "features": [
+    "rating_difference",
+    "rest_difference",
+    "back_to_back_difference"
+  ],
+  "identity": {
+    "68": 59,
+    "reason": "Official franchise 40: Utah rename; Arizona not merged"
+  },
+  "fit_seasons": [
+    2018,
+    2019,
+    2020,
+    2021,
+    2022,
+    2023,
+    2024
+  ],
+  "calibration_seasons": [
+    2025
+  ],
+  "fit_games": 8449,
+  "calibration_games": 1312,
+  "elo": {
+    "k": 10,
+    "home_points": 35,
+    "season_carry": 0.75
+  },
+  "fit": {
+    "center": [
+      -0.0008071444199111225,
+      0.18972659486329743,
+      -0.10474612380163333
+    ],
+    "scale": [
+      0.19973388171607104,
+      1.0920942878408397,
+      0.43710867461487946
+    ],
+    "coefficients": [
+      0.16245644331675257,
+      0.4637996847864656,
+      0.000975333155873157,
+      -0.14216304537310104
+    ],
+    "penalty": 1.0,
+    "converged": true
+  },
+  "calibration": {
+    "center": [
+      0.0
+    ],
+    "scale": [
+      1.0
+    ],
+    "coefficients": [
+      -0.001357421417407691,
+      0.5860883159266689
+    ],
+    "penalty": 0.1,
+    "converged": true
+  },
+  "seed": {
+    "season": 2025,
+    "through": "2026-04-16",
+    "teams": {
+      "10": {
+        "rating": 1455.8804631928879,
+        "games": 864,
+        "last_day": "2026-04-15"
+      },
+      "8": {
+        "rating": 1551.4947513991624,
+        "games": 865,
+        "last_day": "2026-04-14"
+      },
+      "16": {
+        "rating": 1391.0739752257039,
+        "games": 864,
+        "last_day": "2026-04-15"
+      },
+      "3": {
+        "rating": 1459.1699426145433,
+        "games": 864,
+        "last_day": "2026-04-15"
+      },
+      "20": {
+        "rating": 1463.6207714385982,
+        "games": 864,
+        "last_day": "2026-04-16"
+      },
+      "23": {
+        "rating": 1392.2914444595858,
+        "games": 863,
+        "last_day": "2026-04-16"
+      },
+      "26": {
+        "rating": 1474.8948472128275,
+        "games": 864,
+        "last_day": "2026-04-16"
+      },
+      "28": {
+        "rating": 1443.803281513509,
+        "games": 864,
+        "last_day": "2026-04-16"
+      },
+      "6": {
+        "rating": 1515.666986016307,
+        "games": 864,
+        "last_day": "2026-04-14"
+      },
+      "52": {
+        "rating": 1487.1553180821588,
+        "games": 865,
+        "last_day": "2026-04-16"
+      },
+      "7": {
+        "rating": 1566.8917249638237,
+        "games": 863,
+        "last_day": "2026-04-15"
+      },
+      "9": {
+        "rating": 1538.0838816431883,
+        "games": 865,
+        "last_day": "2026-04-15"
+      },
+      "14": {
+        "rating": 1565.5833706320072,
+        "games": 864,
+        "last_day": "2026-04-15"
+      },
+      "4": {
+        "rating": 1513.0857407012022,
+        "games": 863,
+        "last_day": "2026-04-14"
+      },
+      "19": {
+        "rating": 1504.2994672367622,
+        "games": 865,
+        "last_day": "2026-04-16"
+      },
+      "22": {
+        "rating": 1513.6877042626772,
+        "games": 865,
+        "last_day": "2026-04-16"
+      },
+      "18": {
+        "rating": 1475.18465494191,
+        "games": 863,
+        "last_day": "2026-04-16"
+      },
+      "12": {
+        "rating": 1587.6044958847879,
+        "games": 862,
+        "last_day": "2026-04-14"
+      },
+      "25": {
+        "rating": 1568.742113098432,
+        "games": 863,
+        "last_day": "2026-04-15"
+      },
+      "5": {
+        "rating": 1494.645324825376,
+        "games": 863,
+        "last_day": "2026-04-14"
+      },
+      "21": {
+        "rating": 1591.883699871471,
+        "games": 864,
+        "last_day": "2026-04-16"
+      },
+      "30": {
+        "rating": 1534.2565748002496,
+        "games": 863,
+        "last_day": "2026-04-14"
+      },
+      "1": {
+        "rating": 1499.3454786312402,
+        "games": 863,
+        "last_day": "2026-04-14"
+      },
+      "29": {
+        "rating": 1492.0543421490397,
+        "games": 864,
+        "last_day": "2026-04-14"
+      },
+      "17": {
+        "rating": 1486.4080250090283,
+        "games": 865,
+        "last_day": "2026-04-15"
+      },
+      "2": {
+        "rating": 1496.7917209733205,
+        "games": 862,
+        "last_day": "2026-04-14"
+      },
+      "53": {
+        "rating": 1471.02483997482,
+        "games": 700,
+        "last_day": "2024-04-17"
+      },
+      "13": {
+        "rating": 1503.462219058264,
+        "games": 863,
+        "last_day": "2026-04-15"
+      },
+      "15": {
+        "rating": 1530.9055741024035,
+        "games": 863,
+        "last_day": "2026-04-14"
+      },
+      "24": {
+        "rating": 1484.3536101697093,
+        "games": 865,
+        "last_day": "2026-04-16"
+      },
+      "54": {
+        "rating": 1500.7179530220312,
+        "games": 701,
+        "last_day": "2026-04-15"
+      },
+      "55": {
+        "rating": 1436.8623490483726,
+        "games": 410,
+        "last_day": "2026-04-16"
+      },
+      "59": {
+        "rating": 1509.0733538446007,
+        "games": 164,
+        "last_day": "2026-04-16"
+      }
+    }
+  },
+  "teams": {
+    "32": {
+      "code": "QUE",
+      "franchise": 27
+    },
+    "8": {
+      "code": "MTL",
+      "franchise": 1
+    },
+    "58": {
+      "code": "TSP",
+      "franchise": 5
+    },
+    "7": {
+      "code": "BUF",
+      "franchise": 19
+    },
+    "46": {
+      "code": "OAK",
+      "franchise": 13
+    },
+    "48": {
+      "code": "KCS",
+      "franchise": 23
+    },
+    "36": {
+      "code": "SEN",
+      "franchise": 3
+    },
+    "70": {
+      "code": "TBD",
+      "franchise": null
+    },
+    "11": {
+      "code": "ATL",
+      "franchise": 35
+    },
+    "45": {
+      "code": "SLE",
+      "franchise": 3
+    },
+    "28": {
+      "code": "SJS",
+      "franchise": 29
+    },
+    "42": {
+      "code": "QBD",
+      "franchise": 4
+    },
+    "53": {
+      "code": "ARI",
+      "franchise": 28
+    },
+    "13": {
+      "code": "FLA",
+      "franchise": 33
+    },
+    "12": {
+      "code": "CAR",
+      "franchise": 26
+    },
+    "52": {
+      "code": "WPG",
+      "franchise": 35
+    },
+    "18": {
+      "code": "NSH",
+      "franchise": 34
+    },
+    "27": {
+      "code": "PHX",
+      "franchise": 28
+    },
+    "41": {
+      "code": "MWN",
+      "franchise": 2
+    },
+    "39": {
+      "code": "QUA",
+      "franchise": 9
+    },
+    "37": {
+      "code": "HAM",
+      "franchise": 4
+    },
+    "40": {
+      "code": "DCG",
+      "franchise": 12
+    },
+    "35": {
+      "code": "CLR",
+      "franchise": 23
+    },
+    "38": {
+      "code": "PIR",
+      "franchise": 9
+    },
+    "34": {
+      "code": "HFD",
+      "franchise": 26
+    },
+    "1": {
+      "code": "NJD",
+      "franchise": 23
+    },
+    "9": {
+      "code": "OTT",
+      "franchise": 30
+    },
+    "21": {
+      "code": "COL",
+      "franchise": 27
+    },
+    "44": {
+      "code": "NYA",
+      "franchise": 8
+    },
+    "15": {
+      "code": "WSH",
+      "franchise": 24
+    },
+    "31": {
+      "code": "MNS",
+      "franchise": 15
+    },
+    "99": {
+      "code": "NHL",
+      "franchise": null
+    },
+    "43": {
+      "code": "MMR",
+      "franchise": 7
+    },
+    "49": {
+      "code": "CLE",
+      "franchise": 13
+    },
+    "51": {
+      "code": "BRK",
+      "franchise": 8
+    },
+    "50": {
+      "code": "DFL",
+      "franchise": 12
+    },
+    "56": {
+      "code": "CGS",
+      "franchise": 13
+    },
+    "47": {
+      "code": "AFM",
+      "franchise": 21
+    },
+    "57": {
+      "code": "TAN",
+      "franchise": 5
+    },
+    "19": {
+      "code": "STL",
+      "franchise": 18
+    },
+    "17": {
+      "code": "DET",
+      "franchise": 12
+    },
+    "3": {
+      "code": "NYR",
+      "franchise": 10
+    },
+    "24": {
+      "code": "ANA",
+      "franchise": 32
+    },
+    "16": {
+      "code": "CHI",
+      "franchise": 11
+    },
+    "55": {
+      "code": "SEA",
+      "franchise": 39
+    },
+    "5": {
+      "code": "PIT",
+      "franchise": 17
+    },
+    "6": {
+      "code": "BOS",
+      "franchise": 6
+    },
+    "25": {
+      "code": "DAL",
+      "franchise": 15
+    },
+    "14": {
+      "code": "TBL",
+      "franchise": 31
+    },
+    "4": {
+      "code": "PHI",
+      "franchise": 16
+    },
+    "30": {
+      "code": "MIN",
+      "franchise": 37
+    },
+    "29": {
+      "code": "CBJ",
+      "franchise": 36
+    },
+    "2": {
+      "code": "NYI",
+      "franchise": 22
+    },
+    "23": {
+      "code": "VAN",
+      "franchise": 20
+    },
+    "26": {
+      "code": "LAK",
+      "franchise": 14
+    },
+    "59": {
+      "code": "UTA",
+      "franchise": 40
+    },
+    "10": {
+      "code": "TOR",
+      "franchise": 5
+    },
+    "22": {
+      "code": "EDM",
+      "franchise": 25
+    },
+    "54": {
+      "code": "VGK",
+      "franchise": 38
+    },
+    "20": {
+      "code": "CGY",
+      "franchise": 21
+    },
+    "33": {
+      "code": "WIN",
+      "franchise": 35
+    },
+    "68": {
+      "code": "UTA",
+      "franchise": 40
+    }
+  },
+  "source_provenance": {
+    "sources": [
+      {
+        "url": "https://api.nhle.com/stats/rest/en/game?cayenneExp=season%3D20252026+and+gameType%3D2&limit=2&start=0",
+        "observed_at": "2026-10-15T22:48:30.598574+00:00",
+        "bytes": 517,
+        "sha256": "112814f7a99bb706b550b974633f079de1635666dc2b3fa4f4b757e756d166bb",
+        "used_in_dataset": false
+      },
+      {
+        "url": "https://api.nhle.com/stats/rest/en/game?cayenneExp=season%3E%3D20152016+and+season%3C%3D20252026+and+gameType%3D2&limit=10000&sort=%5B%7B%22property%22%3A+%22id%22%2C+%22direction%22%3A+%22ASC%22%7D%5D&start=0",
+        "observed_at": "2026-10-15T22:49:03.457380+00:00",
+        "bytes": 2494984,
+        "sha256": "c78b55253c7a6fc09f6fd03e188746f69107688a2692b7c541fa223cd18ba9fe",
+        "used_in_dataset": true
+      },
+      {
+        "url": "https://api.nhle.com/stats/rest/en/team?limit=200",
+        "observed_at": "2026-10-15T22:49:07.664480+00:00",
+        "bytes": 6664,
+        "sha256": "d692a7b564603459d12462dd37de7347b6d52f8fce8d8004eb212742cc993337",
+        "used_in_dataset": true
+      },
+      {
+        "url": "https://api.nhle.com/stats/rest/en/game?cayenneExp=season%3E%3D20152016+and+season%3C%3D20252026+and+gameType%3D2&limit=10000&sort=%5B%7B%22property%22%3A+%22id%22%2C+%22direction%22%3A+%22ASC%22%7D%5D&start=10000",
+        "observed_at": "2026-10-15T22:49:07.876904+00:00",
+        "bytes": 876770,
+        "sha256": "9e28bef1d5d8017f7a4a466dc62026179ed7bfd6402a846626dd88963a955dbb",
+        "used_in_dataset": true
+      }
+    ],
+    "requests_in_ledger": 4,
+    "downloaded_bytes": 3378935,
+    "paid_requests": 0
+  },
+  "collection": {
+    "threshold": 0.03,
+    "quote_max_age_seconds": 300,
+    "units": 1,
+    "market": "h2h_final_including_ot_so",
+    "maximum_positions_per_fixture": 1,
+    "operational_checkpoint_days": 14,
+    "operational_checkpoint_pairs": 100,
+    "real_money_release": "Separate evidence review required; never automatic"
+  },
+  "limitations": [
+    "Team-only; no goalie adjustment",
+    "Historical test seasons have already been examined",
+    "No demonstrated sportsbook edge; forward paper research only"
+  ],
+  "inference_code_sha256": {
+    "nhl_paper_model.py": "a1649a83a7a5fb57e941dd0d91dd0333fff2107377ccca7c099b3c259bcca86a",
+    "nhl_paper_history.py": "fa7469872de7549780978efaf269191a5a54a453d451de664073790ff45a20aa",
+    "nhl_paper.py": "3046582628b250b45087b3341dd341701bed4fb3a2f6e37210001596a4225b1b"
+  }
+}
