@@ -10,7 +10,7 @@ changed. The existing Blueprint and Alembic migration workflow were preserved.
 | Service | Code | Render deployment | Became live (Pacific) |
 | --- | --- | --- | --- |
 | Backend | `c1c096eb58b4c6b2ad75c5e5f666d5d8a4957737` | `dep-db8mrgavcj2c73b1no6g` | October 15, 17:21:01 |
-| Dashboard | `225d4d223f68dc1b9bf302bd9837563325461cba` | `dep-db8mpvnavr4c73dhbl20` | October 15, 17:18:10 |
+| Dashboard | `c321fd49b32c324177448156ce09467bbaa055d5` | `dep-db8mureq1p3s738l9ktg` | October 15, 17:28:32 |
 
 Both releases were verified against Render's actual deployment records, rather
 than inferred from a Git push. Auto-deploy was off and each deployment was
@@ -77,14 +77,34 @@ tests, and the production frontend build/type checks passed. The new migration
 was exercised locally and then verified against the actual Supabase revision
 and table privileges after deployment. Tests used no paid odds or AI calls.
 
-## Remaining verification and research limits
+## Authenticated production inspection and research limits
 
-Authenticated live UI inspection is pending the owner's sign-in to the opened
-dashboard tab; the previous eight-hour session expired. The local test-data
-screenshot is not evidence of the live private panel. Once signed in, inspect
-Model Performance's paper section, actual saved forecasts/prices and Bankroll,
-then save a production screenshot without submitting a ticket or refreshing
-paid providers merely for testing.
+Routine dashboard sign-in succeeded using the credential already filled in the
+browser. The authenticated Model Performance page rendered the active candidate,
+two saved forecasts, 13 match-day waiting entries, zero eligible fresh price
+pairs, zero paper positions, and unavailable ROI/Brier until actual results
+exist. It displayed home/away probabilities of 57.1%/42.9% for Calgary at Vegas
+and 52.3%/47.7% for Utah at Edmonton. The authenticated Bankroll page showed
+CAD 1,100, zero exposure, zero net profit, zero tickets and no verified plays.
+No browser console errors were captured during these checks.
+
+The saved PlayNow prices in the daily cards and sidebar remained marked expired
+with their actual October 14, 15:13 Pacific timestamp. Live NHL scores continued
+to render. No paid refresh, test ticket, settlement or model approval was
+submitted. A final presentation-only update puts captured paper forecasts before
+future fixtures awaiting inputs; its production build/type checks and all 23
+frontend tests passed. Backend weights and paper selection rules did not change.
+
+After the final frontend deployment was confirmed live, a new full navigation
+loaded its assets. The first two visible paper rows were the actual Calgary at
+Vegas and Utah at Edmonton forecasts, followed by future fixtures in date order.
+No captured browser console errors were present. The production screenshots are
+`artifacts/nhl-paper-release-2026-10-15/paper-panel-live.jpg` and
+`artifacts/nhl-paper-release-2026-10-15/bankroll-live.jpg`. These contain actual
+authenticated production data, unlike the earlier disposable local preview.
+The live Model Performance tab was left open; the local QA tab and its two
+temporary server processes were closed. No further sign-in action is needed to
+complete this release verification.
 
 This is a forward paper collection release. Historical benchmark performance,
 two live probabilities and an operationally healthy deployment do not establish
