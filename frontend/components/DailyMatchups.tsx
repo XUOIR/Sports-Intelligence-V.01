@@ -8,7 +8,7 @@ import {pacificTime} from '@/lib/time.mjs';
 import TeamLogo from './TeamLogo';
 import './DailyMatchups.css';
 const percent=(p:number|undefined)=>p===undefined?'—':`${(p*100).toFixed(1)}%`;
-const odds=(p:number|null|undefined)=>p==null?'—':p.toFixed(3);
+const odds=(p:number|null|undefined)=>p==null?'—':p.toFixed(2);
 const signed=(value:number)=>`${value>=0?'+':''}${value.toFixed(1)}`;
 
 export default function DailyMatchups({fixtures,quotes,statistics,paper,clock,onOpen}:{fixtures:Fixture[];quotes:Record<string,Quote[]>;statistics:Record<string,NHLTeamComparison>;paper?:PaperResults;clock:number;onOpen:(f:Fixture)=>void}){
@@ -23,7 +23,7 @@ export default function DailyMatchups({fixtures,quotes,statistics,paper,clock,on
       <div className="card-heading"><span className="eyebrow">NHL · {pacificTime(f.commence_time)} PT</span><span className={`badge ${state.toLowerCase()}`}>{decisionLabel(state)}</span></div>
       <button className="match-title" onClick={()=>onOpen(f)} aria-label={`Open ${f.away} at ${f.home}`}><h3>{(['away','home'] as const).map(side=><span className="match-team" key={side}><TeamLogo abbreviation={f.metrics[`${side}_abbrev`]}/><span>{f[side]}<small>{side==='away'?'AWAY':'HOME'}{side==='home'?' ↗':''}</small></span></span>)}</h3></button>
       <div className="daily-prices"><span className="eyebrow">PLAYNOW · MONEYLINE</span><span className={`badge ${!pair||pair.stale?'hold':'watch'}`}>{!pair?'UNAVAILABLE':pair.stale?'LAST RECEIVED':'CURRENT PRICE'}</span></div>
-      <div className="price-pair">{(['away','home'] as const).map(side=><div key={side}><span>{f[side]}</span><strong>{pair?Number(pair[side].decimal_odds).toFixed(3):'—'}</strong><small>{pair?`${percent(1/Number(pair[side].decimal_odds))} break-even`:'No saved PlayNow price'}</small></div>)}</div>
+      <div className="price-pair">{(['away','home'] as const).map(side=><div key={side}><span>{f[side]}</span><strong>{pair?Number(pair[side].decimal_odds).toFixed(2):'—'}</strong><small>{pair?`${percent(1/Number(pair[side].decimal_odds))} break-even`:'No saved PlayNow price'}</small></div>)}</div>
       <div className="daily-xg"><div className="daily-stat-heading"><b>5v5 xG Share</b><span>{showStats?(statsStale?'LAST VALID DATA':'PRIOR GAMES'):'UNAVAILABLE'}</span></div><div className="xg-pair">{(['away','home'] as const).map(side=>{
         const value=xg[side],metrics=stats?.sides[side]?.metrics;
         return <div key={side}><div><span>{f.metrics[`${side}_abbrev`] as string||f[side]}</span><strong>{percent(value?.share)}</strong></div><div className={`xg-track ${value?'':'unknown-range'}`} role="meter" aria-label={`${f[side]} historical 5v5 xG share`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={value?value.share*100:undefined} aria-valuetext={value?`${percent(value.share)} over ${value.sample} prior games`:'Unavailable'}><span style={{width:value?`${value.share*100}%`:'0%'}}/></div><small>{value?`${value.sample} games · latest ${value.latest}`:metrics?.status==='not_pre_game'?'No eligible pregame cache':metrics?.status==='insufficient_sample'?'Fewer than 3 prior games':'Awaiting eligible statistics'}</small></div>;

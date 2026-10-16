@@ -96,6 +96,9 @@ async def test_failed_request_keeps_previous_cache_and_never_retries(database,mo
     with pytest.raises(advanced.BudgetExceeded):await advanced.sync(transport=httpx.MockTransport(failed))
     async with database() as session:
         assert (await session.get(ProviderState,advanced.CACHE_KEY)).info==previous
+        failure=(await session.get(ProviderState,advanced.STATUS_KEY)).info
+        assert failure['stage']=='team_download'
+        assert failure['reason']=='NHL file request failed; no retry'
         assert (await session.get(RuntimeLimit,f'moneypuck-wire:{now():%Y-%m}')).used==advanced.RESERVATION
         assert (await session.scalars(select(ProviderCall))).all()==[]
 
@@ -124,7 +127,16 @@ async def test_changed_coverage_retains_cache_and_reservation(database,monkeypat
     assert result['status']=='failed'
     async with database() as session:
         assert await session.get(ProviderState,advanced.CACHE_KEY) is None
+        assert (await session.get(ProviderState,advanced.STATUS_KEY)).info['stage']=='source_validation'
         assert (await session.get(RuntimeLimit,f'moneypuck-wire:{now():%Y-%m}')).used==advanced.RESERVATION
+
+
+def test_import_diagnostics_never_publish_untrusted_exception_text():
+    error=ValueError('upstream body https://example.com/?token=secret-do-not-publish')
+    failure=advanced.import_failure(error,'team_download')
+    assert failure['category']=='ValueError' and failure['stage']=='team_download'
+    assert 'secret-do-not-publish' not in str(failure)
+    assert failure['retained_previous_cache'] is True
 
 
 async def test_detail_read_is_cache_only_truthfully_stale_and_does_not_modify_fixture(database,monkeypatch):

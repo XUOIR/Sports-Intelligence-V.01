@@ -3,10 +3,11 @@ import type {NHLStarterPreview} from '@/lib/types';
 import {starterStatus} from '@/lib/starters.mjs';
 import {pacificTime} from '@/lib/time.mjs';
 
-export default function NHLStarters({data,home,away,clock}:{clock:number;data?:NHLStarterPreview|null;home:string;away:string}){
+export default function NHLStarters({data,home,away,clock,onVerify,canVerify=true}:{clock:number;data?:NHLStarterPreview|null;home:string;away:string;onVerify?:()=>void;canVerify?:boolean}){
   if(!data)return null;
   return <section className="nhl-statistics" aria-label="Starting Goalies">
     <h3>Starting Goalies</h3>
+    {onVerify&&<button className="outline-button" disabled={!canVerify} onClick={onVerify}>Confirm Starting Goalies Manually</button>}
     <div className="nhl-team-comparison">{(['away','home'] as const).map(side=>{
       const row=data.sides[side],status=starterStatus(row,data,clock);
       return <article key={side}><h4>{side==='home'?home:away}</h4>

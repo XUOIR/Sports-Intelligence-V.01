@@ -82,6 +82,8 @@ async def operational_status(session):
     return {'active_sports':list(settings.active_sports),'paid_paused':paused,'providers':providers,
         'nhl_scores':{'daily_used':score_budget.used if score_budget else 0,'daily_cap':settings.nhl_score_daily_requests,'paid_credits':0},
         'nhl_statistics':{'enabled':settings.nhl_advanced_enabled,'status':advanced_state.info.get('status') if advanced_state else 'pending',
+            'failure_stage':advanced_state.info.get('stage') if advanced_state and advanced_state.info.get('status')=='failed' else None,
+            'failure_reason':advanced_state.info.get('reason') if advanced_state and advanced_state.info.get('status')=='failed' else None,
             'daily_imports_used':advanced_batch.used if advanced_batch else 0,'daily_imports_cap':1,
             'bytes_monthly_used':advanced_wire.used if advanced_wire else 0,'bytes_monthly_cap':settings.nhl_advanced_monthly_bytes,
             'observed_at':aware(advanced_cache.observed_at) if advanced_cache else None,

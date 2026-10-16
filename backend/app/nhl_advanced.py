@@ -11,6 +11,7 @@ from email.utils import parsedate_to_datetime
 import hashlib
 import io
 import json
+import logging
 from pathlib import Path
 import tempfile
 import time
@@ -38,6 +39,26 @@ MAX_REFERENCE = 2_000_000
 RESERVATION = MAX_TEAM_WIRE + MAX_GOALIE_WIRE + MAX_REFERENCE
 CACHE_KEY = "nhl-advanced-statistics"
 STATUS_KEY = "nhl-advanced-import"
+log = logging.getLogger('nhl-statistics')
+SAFE_IMPORT_REASONS = frozenset({
+    'NHL file request failed; no retry', 'Required bandwidth-safe encoding unavailable',
+    'NHL file transport cap exceeded', 'NHL file publication time is missing, future or too old',
+    'NHL wire-byte cap exceeded', 'NHL decoded-byte cap exceeded', 'Incomplete NHL file',
+    'NHL decompression budget/trailing data rejected', 'NHL parsing deadline exceeded',
+    'Incomplete/current-day game appeared in daily source', 'Duplicate NHL team statistic',
+    'NHL goalie ZIP contract changed', 'Unexpected goalie season/day', 'Duplicate goalie statistic',
+    'Current-season NHL coverage is incomplete', 'Official NHL verification date mismatch',
+    "Previous day's NHL games are not all final", 'NHL sources do not reconcile',
+    'Team and goalie files have different game coverage', 'Official NHL verification request failed',
+    'NHL verification byte cap exceeded', 'NHL statistics cache exceeded byte cap',
+})
+
+
+def import_failure(exc, stage):
+    # Publish only our fixed validation messages, never upstream bodies/URLs.
+    reason = str(exc) if isinstance(exc, ValueError) and str(exc) in SAFE_IMPORT_REASONS else 'Import did not complete; inspect the stage and error category.'
+    return {'status': 'failed', 'stage': stage, 'category': type(exc).__name__, 'reason': reason,
+            'failed_at': now().isoformat(), 'retained_previous_cache': True}
 
 
 async def download(client, url, path, *, compressed=False):
@@ -171,6 +192,7 @@ async def sync(*, transport=None, admission=None):
         raise BudgetExceeded("The 2026 NHL source contract requires a season update")
     monthly_key, day = admission or await reserve_batch()
     await limits.observe(STATUS_KEY, {"status": "running", "started_at": now().isoformat(), "date": str(day)})
+    stage = 'team_download'
     try:
         async with asyncio.timeout(180):
             with tempfile.TemporaryDirectory(prefix="nhl-statistics-") as temporary:
@@ -178,10 +200,12 @@ async def sync(*, transport=None, admission=None):
                 async with httpx.AsyncClient(timeout=15, follow_redirects=False, transport=transport,
                                             headers={'User-Agent':'G-Sports-private-statistics/0.1'}) as client:
                     team_source = await download(client, TEAM_URL, team_path, compressed=True)
+                    stage = 'goalie_download'
                     goalie_source = await download(client, GOALIE_URL, goalie_path)
                     # One explicit, bounded free verification request; no generic
                     # retry loop and no odds/AI fallback.
                     reference_url = f"https://api-web.nhle.com/v1/score/{day - timedelta(days=1)}"
+                    stage = 'official_verification'
                     await limits.reserve("nhl", 1)
                     async with client.stream("GET", reference_url, headers={"Accept-Encoding": "identity"}) as response:
                         if response.status_code != 200:
@@ -192,6 +216,7 @@ async def sync(*, transport=None, admission=None):
                                 raise ValueError("NHL verification byte cap exceeded")
                             body.extend(chunk)
                     reference = json.loads(body)
+                stage = 'source_validation'
                 parse = asyncio.create_task(asyncio.to_thread(build_batch, team_path, goalie_path, day, reference,
                                                              {"team": team_source, "goalie": goalie_source}))
                 try:
@@ -205,6 +230,7 @@ async def sync(*, transport=None, admission=None):
         if len(serialized.encode()) > 200_000:
             raise ValueError("NHL statistics cache exceeded byte cap")
         actual = team_source["wire_bytes"] + goalie_source["wire_bytes"] + MAX_REFERENCE
+        stage = 'cache_save'
         async with db.Session.begin() as session:
             stmt = insert(ProviderState).values(provider=CACHE_KEY, observed_at=now(), info=batch)
             await session.execute(stmt.on_conflict_do_update(index_elements=[ProviderState.provider],
@@ -220,8 +246,9 @@ async def sync(*, transport=None, admission=None):
         await limits.observe(STATUS_KEY, result)
         return result
     except (Exception, asyncio.CancelledError) as exc:
-        await limits.observe(STATUS_KEY, {"status": "failed", "date": str(day), "category": type(exc).__name__,
-                                        "failed_at": now().isoformat(), "retained_previous_cache": True})
+        failure = {**import_failure(exc, stage), 'date': str(day)}
+        await limits.observe(STATUS_KEY, failure)
+        log.warning('NHL statistics import failed at %s: %s (%s)', stage, failure['reason'], failure['category'])
         if isinstance(exc, asyncio.CancelledError):
             raise
         # Do not emit upstream exception text or retry this day's admission.

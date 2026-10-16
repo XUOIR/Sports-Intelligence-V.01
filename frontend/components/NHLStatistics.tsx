@@ -1,21 +1,23 @@
 'use client';
 import {useState} from 'react';
-import type {NHLStatistics as Statistics,NHLTeamStatistics,NHLGoalieStatistics} from '@/lib/types';
+import type {NHLStatistics as Statistics,NHLTeamStatistics,NHLGoalieStatistics,GoalieSelection} from '@/lib/types';
 import {pacificTime} from '@/lib/time.mjs';
+import {selectedGoaliePair} from '@/lib/starters.mjs';
 
 const value=(v:string|undefined,digits=2)=>v!==undefined&&Number.isFinite(Number(v))?Number(v).toFixed(digits):'—';
 const share=(v:string|undefined)=>v!==undefined&&Number.isFinite(Number(v))?`${(Number(v)*100).toFixed(1)}%`:'—';
 
-export default function NHLStatistics({data}:{data:Statistics|null|undefined}){
+export default function NHLStatistics({data,onVerifyGoalies,canVerify=true}:{data:Statistics|null|undefined;onVerifyGoalies?:(names:GoalieSelection)=>void;canVerify?:boolean}){
   const [selected,setSelected]=useState<Record<string,string>>({});
   if(!data)return null;
   if(!data.sides)return <section className="nhl-statistics" aria-label="NHL Matchup Statistics"><h3>NHL Matchup Statistics</h3><p className="muted">{data.message||'Statistics are awaiting verification.'}</p></section>;
+  const goaliePair=selectedGoaliePair(data,selected);
   return <section className="nhl-statistics" aria-label="NHL Matchup Statistics"><div className="nhl-statistics-heading"><h3>NHL Matchup Statistics</h3><span className={`badge ${data.status==='stale'?'hold':'watch'}`}>{data.status==='stale'?'LAST VALID DATA':'GAME HISTORY'}</span></div><p className="nhl-statistics-source">Games through {data.verified_through} · Retrieved {data.observed_at?pacificTime(data.observed_at)+' PT':'—'}</p>{data.status==='stale'&&<p className="notice" role="status">These statistics need a newer import. The last valid values are retained.</p>}
   <div className="nhl-team-comparison">{(['away','home'] as const).map(side=>{
     const team=data.sides![side],metrics=team.metrics,goalies=team.goalies||[];
     const goalie=goalies.find(g=>g.player_id===selected[side]);
     return <article key={side}><span className="eyebrow">{side==='away'?'AWAY':'HOME'}</span><h4>{team.team}</h4><TeamMetrics metrics={metrics}/><label className="nhl-goalie-select">Compare goalie<select aria-label={`${side} goalie statistics`} value={selected[side]||''} onChange={e=>setSelected(current=>({...current,[side]:e.target.value}))}><option value="">Select a goalie</option>{goalies.map(g=><option key={g.player_id} value={g.player_id}>{g.name}</option>)}</select></label>{goalie?<GoalieMetrics goalie={goalie}/>:<p className="nhl-statistics-note">Choose a goalie to inspect their history. This selection does not confirm the starter.</p>}</article>;
-  })}</div><p className="nhl-statistics-note">5v5 share uses total expected goals for ÷ total expected goals for and against. GSAx uses expected goals against − actual goals against. Windows use up to ten prior games; actual samples are shown.</p><p className="nhl-statistics-note">{data.note}</p><a className="text-button" href={data.source_url||'https://moneypuck.com/data.htm'} target="_blank" rel="noreferrer">Data: MoneyPuck.com ↗</a></section>;
+  })}</div>{onVerifyGoalies&&<div className="goalie-confirm-action"><button className="outline-button" disabled={!goaliePair||!canVerify} onClick={()=>{if(goaliePair)onVerifyGoalies(goaliePair);}}>Verify Selected Goalies</button><p className="nhl-statistics-note">{!canVerify?'The game has started; pregame confirmations are closed.':goaliePair?'Opens a confirmation form with both selected names. Add a public source and explicitly confirm the starters before saving.':'Choose one goalie for each team to prepare a manual confirmation. Comparing statistics alone does not verify a starter.'}</p></div>}<p className="nhl-statistics-note">5v5 share uses total expected goals for ÷ total expected goals for and against. GSAx uses expected goals against − actual goals against. Windows use up to ten prior games; actual samples are shown.</p><p className="nhl-statistics-note">{data.note}</p><a className="text-button" href={data.source_url||'https://moneypuck.com/data.htm'} target="_blank" rel="noreferrer">Data: MoneyPuck.com ↗</a></section>;
 }
 
 function TeamMetrics({metrics}:{metrics:NHLTeamStatistics|null|undefined}){
