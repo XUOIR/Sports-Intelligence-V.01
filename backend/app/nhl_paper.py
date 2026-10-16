@@ -134,6 +134,11 @@ async def collect(bundle=None, digest=None):
                 continue
             if row.captured_at is None:
                 try:
+                    # Check the cheap calendar condition before fetching a full
+                    # season cache/archive. Future fixtures are revisited each
+                    # minute; transferring that history for them wastes DB egress.
+                    if aware(fixture.commence_time).astimezone(history.EASTERN).date() != at.astimezone(history.EASTERN).date():
+                        raise ValueError('Awaiting match day so previous-day results can be included')
                     cached = await session.get(ProviderState, history.KEY)
                     if cached:
                         archive = await session.get(PaperInputArchive, cached.info.get('archive_sha256') or '')

@@ -108,8 +108,15 @@ cd backend
 ..\.venv\Scripts\python.exe -m research.check_paper_source --ledger ../artifacts/nhl-forward-paper-qa/source-check.sqlite3
 ```
 
-The final candidate SHA-256 is
-`405edb95e305256297af50fe6f77efdcabf3949db9587edb212f486743afeb11`.
+The current candidate SHA-256 is
+`617e76ac7eda011241cd396ca45b0a80c97d62f2d70c30294c4253cd43667756`.
+The first live candidate (`405edb95e305…`) captured two genuine pregame
+forecasts. A live operational check then found avoidable archive transfers for
+future-day fixtures. The collector now checks the calendar before loading that
+history. Fitted probabilities, seed data and selection rules are unchanged;
+because collection source hashes are frozen, the optimization gets a separate
+candidate identity. The first two records remain preserved under their original
+identity, with no paper positions or real bankroll changes.
 The private production database migration and live scheduler/price collection
 must still be verified at deployment. Local SQLite migration checks and
 PostgreSQL DDL compilation do not substitute for that live verification.

@@ -176,6 +176,27 @@ async def test_stale_position_never_created_and_later_price_can_qualify(database
         assert await session.scalar(select(func.count()).select_from(PaperPriceObservation))==2
 
 
+async def test_future_fixture_does_not_transfer_full_history_or_archive(database):
+    from sqlalchemy import event
+    f=fixture(now()+timedelta(days=1))
+    async with database.begin() as session:
+        session.add(f)
+    statements=[]
+    async with database() as session:
+        engine=session.bind.sync_engine
+    def record(conn,cursor,statement,parameters,context,executemany):
+        statements.append(statement.lower())
+    event.listen(engine,'before_cursor_execute',record)
+    try:
+        await paper.collect()
+    finally:
+        event.remove(engine,'before_cursor_execute',record)
+    assert not any('select provider_state.' in s or 'select paper_input_archives.' in s for s in statements)
+    async with database() as session:
+        row=await session.scalar(select(PaperForecast))
+        assert row.captured_at is None and row.issue.startswith('Awaiting match day')
+
+
 async def test_game_start_during_collection_never_creates_late_position(database,monkeypatch):
     f=await seed(database)
     original=paper.latest_quotes
