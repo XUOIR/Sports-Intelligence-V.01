@@ -103,3 +103,36 @@ kept separately from the synthetic local preview under ignored
 No paid odds batch or AI generation was sent during this implementation.
 The existing three-credit batch is still the only metered provider call today.
 The configured US$3 monthly AI ceiling remains unchanged.
+
+## Final live verification
+
+Runtime commit `4ddbc87495d6e5b75fa4538f81b8e993bca92401` is live on both
+services. Backend deploy `dep-db9bf167bikc73fdioqg` finished at 16:47:57 Pacific;
+frontend deploy `dep-db9bf267bikc73fdirc0` finished at 16:48:25 Pacific.
+Backend readiness/liveness and the frontend login page returned HTTP 200.
+No error-level app logs were returned in the post-deploy inspection window.
+
+A full production reload showed 2.75 / 1.47 in Colorado's card, 1.90 / 1.90 in
+Anaheim's card, both saved forecasts and all four signed price edges. The
+original 14:58 prices remained expired. The live dropdowns enabled **Verify
+Selected Goalies** only after both sides were selected, and opened the form
+with the matching names. Its source URL was blank and all verification
+checkboxes were unchecked. The form was canceled without submission; these
+UI selections were not asserted as the actual starters.
+
+The real Colorado detail panel reported available official schedule, standings
+and form; stale MoneyPuck statistics; a 17:30 Pacific T−30 checkpoint; and no
+compatible approved NHL model. Those are actual remaining prerequisites.
+Paper probabilities did not populate the separate validated-model field.
+
+At 16:48:57 Pacific the production audit still showed one metered provider call
+today (three odds credits), one consumed MoneyPuck import, zero new starter
+evidence, CAD 1,100 initial bankroll and zero actual tickets. The paper collector
+was healthy on its original candidate, with four forecasts, two resolved
+forecasts and one simulated position. Restarting the backend did not duplicate
+the position or repeat the failed statistics import.
+
+The final production card screenshot is
+`artifacts/daily-matchups-2026-10-16/daily-matchups-live.jpg`; the unsent
+confirmation form is `goalie-confirmation-live-not-submitted.jpg`. The isolated
+QA tab and temporary local server were closed after testing.
