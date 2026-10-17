@@ -88,3 +88,37 @@ was issued for this work. Live verification is recorded after deployment.
 **Can Get To:** send the MoneyPuck request; optionally send the Daily Faceoff
 enquiry. These unblock supported automatic-source decisions. The new manual
 confirmation path does not depend on a provider reply.
+
+
+## Live release verification
+
+Code commit `6bc843b10bda95a3f0b440cb789552b12fb6d80b` was pushed to the active
+repository. Both Render services report that exact commit live:
+
+- Backend `dep-db9f1tfavr4c73dqt3mg`, live 2026-10-17 03:52:58 UTC.
+- Dashboard `dep-db9f2b7btjjs73bg2hdg`, live 2026-10-17 03:54:25 UTC.
+- Backend `/health/live` and `/health/ready`: HTTP 200.
+- Final local checks: 276 backend tests, 29 frontend tests, two offline paper
+  consistency tests, and Next.js production build passed. GitHub's combined-status
+  connector returned no statuses; no claim of a passing GitHub Actions run is made.
+- Database audit after deployment: Odds API 3 credits today / 12 this month;
+  no daily/monthly AI reservations; MoneyPuck protected transfer 148,228,199 bytes
+  with each October 16 import/probe/recovery admission still consumed. These are
+  local counters, not a newly fetched provider invoice. Zero approved NHL models.
+- The frozen current paper cohort remains four captured forecasts, two resolved,
+  one paper position. Earlier candidate results are kept separate.
+
+A separate score feed failure at 20:39 PT reported a schema validation error.
+The existing free-provider 15-minute cooldown was preserved. Once it expired,
+one bounded diagnostic read through the existing `nhl_scores` cap returned two
+valid games and passed the parser. The public response is saved only in ignored
+local QA artifacts. This did not use odds or AI credits; no parser rule was
+weakened without a reproducible failing payload.
+
+
+The normal scheduled score feed subsequently recovered at 20:54:57 PT with a
+30-second interval and no parser relaxation or circuit reset. The refreshed live
+site showed Pittsburgh–Colorado Final (2–5) and Boston–Anaheim still live. Original
+prices retained their expired label. The transient failure remains recorded for
+diagnosis; a different temporary response cannot be reconstructed from a later
+successful one.
