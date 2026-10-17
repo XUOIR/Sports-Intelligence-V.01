@@ -122,3 +122,30 @@ site showed Pittsburgh–Colorado Final (2–5) and Boston–Anaheim still live.
 prices retained their expired label. The transient failure remains recorded for
 diagnosis; a different temporary response cannot be reconstructed from a later
 successful one.
+
+
+A bounded public Daily Faceoff feasibility request returned HTTP 200 without a
+redirect (110,147 decoded bytes). Offline extraction of its publicly embedded
+page data identified both games and all four displayed Confirmed goalies with
+reporter links/update times, excluding article prose, ratings and bookmaker odds.
+No /api/ or /cms/ route was accessed. This proves one local public-page read and
+factual extraction, not permission, a supported API or unattended Render access.
+No historical pregame confirmation was backfilled from this evening's read.
+
+Live UI checking caught a React sibling-key collision causing the starter panel
+to duplicate on clock ticks. Keys are now distinct for starters and statistics.
+The rebuilt dashboard fix `fd3277d4fbf2822889f20fb02eb64f262033a9e9` is live in
+Render deploy `dep-db9f3tfbtjjs73bg8mtg` (2026-10-17 03:57:44 UTC); the backend
+remains on the tested `6bc843b` release. This is a frontend-only reconciliation
+fix and does not change any forecasts, source budgets or database records.
+
+
+Final live UI check on the October 17 New Jersey–Washington fixture found one
+Starting Goalies panel across repeated clock updates. Each team had its own saved
+player options. Selecting both enabled Confirm Selection; no confirmation was
+submitted, and both test selections were cleared. Historical comparison remained
+separate, Additional Evidence & Reviews remained collapsed, and today's already
+started games had disabled pregame confirmation. Screenshots were saved in ignored
+`artifacts/nhl-manual-goalies-2026-10-16/` (starting-goalies-live.jpg and
+source-diagnostics-live.jpg). The production dashboard tab remains open on the
+cleared form for the owner.
