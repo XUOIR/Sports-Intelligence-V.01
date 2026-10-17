@@ -104,3 +104,19 @@ that different production model, manufacture historical inputs, approve an AI
 audit or transform paper results into real betting recommendations. The next
 scientific step remains collecting and evaluating the frozen forward cohort;
 there is no honest instant code change that establishes an edge over sportsbooks.
+
+## Final release verification
+
+Recovery code commit `e9885ede81badc5ac830fdb06327a179e0c70d72` was pushed to
+the active repository. Backend deploy `dep-db9bp3lg1s2s7384corg` became live at
+00:09:27 UTC October 17 (17:09 Pacific October 16). Both `/health/live` and
+`/health/ready` returned HTTP 200 after that release. The diagnostic frontend
+remains at the verified `f4559bc` release; recovery adds no browser interface.
+All 29 frontend tests also passed.
+
+The final database check still showed only today's earlier one odds request
+(three units), no AI generation and no manual recovery admission. The advanced
+cache is still October 15. The local ignored database configuration had not
+been repaired, so no successful recovery, new statistics or approved production
+recommendation is claimed. Production screenshot:
+`artifacts/nhl-gap-diagnosis-2026-10-16/source-diagnostic-live.jpg`.
