@@ -35,6 +35,72 @@ rollback, one-chunk termination, unchanged import/cache state and untrusted
 body redaction. Existing model and spending tests remain intact. No frozen
 paper inference/collection source file or fitted model bundle changed.
 
-Runtime production results and any resulting corrective change will be recorded
-after the guarded diagnostic completes. No full-file retry or successful import
-is claimed by these preparation checks.
+## Verified production result
+
+Commit `f4559bc` is live on both Render services. The single admitted check at
+17:04:38 Pacific returned HTTP 302 for the team file and HTTP 403 for the goalie
+file. Neither source passed the import transport contract. The old 09:00 failure
+did not preserve its response details, so this establishes the present failure
+without claiming the exact earlier response is known. Local HEAD requests for
+the identical public URLs returned HTTP 200 and current publication headers.
+
+The probe reservation brought October's protected transfer total to 114,785,063
+bytes. The regular daily import remains consumed at one; the diagnostic is also
+consumed at one. No odds or AI request was issued. The current advanced cache
+remains October 15, verified through October 14. A successful small diagnostic
+would not have been a full import; this one did not succeed even at transport.
+
+## Tested manual recovery fallback
+
+`app.nhl_statistics_recovery` is an operator command, not a scheduled or web
+fallback. It runs the same official public downloads, header/byte/time limits,
+full-file parser and NHL result reconciliation from the operator's computer.
+It does not follow redirects, change user agents, use a proxy or alternate
+source, bypass access controls, approve a model, confirm a starter or call a
+paid provider. A source denial still stops the attempt.
+
+Admission requires today's consumed failed import, a failed source diagnostic
+no more than one hour old that actually recorded a redirect/access denial, no
+current-day cache, and available transfer capacity. It reserves another full
+45,943,040 bytes against the existing monthly limit before downloading anything.
+The separately audited `moneypuck-manual-recovery:<Pacific date>` limit permits
+only one explicit recovery per day, including failures. It does not clear the
+original daily admission. Successful complete validation releases only known
+unused capacity, exactly as the normal importer does; uncertain failures retain
+the full reservation. Successful data records `operator_public_download` as
+its acquisition method, with genuine source observation/publication timestamps.
+
+All 253 backend tests pass. The six recovery tests cover prerequisite/freshness
+checks, one-attempt enforcement, shared-cap rollback, unchanged daily admission,
+complete reconciliation, paid-call absence, failed-cache retention and provenance.
+The frozen paper model/collector/bundle remain unchanged.
+
+Before running recovery, a read-only local database check failed authentication
+(`InvalidPasswordError`). No recovery was admitted or download issued. The user
+was asked to update only the local ignored `.env` database URL from the working
+Render configuration, without sharing secrets in chat. This is a required local
+credential repair, not a request to increase any allowance.
+
+After that repair, run from `backend/` in PowerShell:
+
+```powershell
+$env:ENABLE_NHL_ADVANCED_STATS='true'
+..\.venv\Scripts\python.exe -m app.nhl_statistics_recovery --run
+```
+
+The command refuses a stale diagnostic rather than bypassing its guard. If the
+one-hour prerequisite has expired, wait for the next day's available diagnostic
+or resolve provider access; do not reset counters. An unattended long-term fix
+still requires MoneyPuck to support this hosting network or an explicitly
+approved reliable data source. The manual recovery is a temporary operational
+fallback, not a claim that Render source access has been repaired.
+
+## Other gaps that fresh odds cannot repair
+
+The odds-independent paper model has genuinely saved forecasts and today's
+paired price observations already produced one simulated position. Production
+model approval remains absent. Restoring descriptive xG/GSAx does not validate
+that different production model, manufacture historical inputs, approve an AI
+audit or transform paper results into real betting recommendations. The next
+scientific step remains collecting and evaluating the frozen forward cohort;
+there is no honest instant code change that establishes an edge over sportsbooks.

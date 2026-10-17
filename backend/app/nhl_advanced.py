@@ -263,7 +263,41 @@ async def reserve_batch():
     return f"moneypuck-wire:{at:%Y-%m}", at.date()
 
 
-async def sync(*, transport=None, admission=None):
+async def reserve_manual_recovery():
+    """Explicit operator fallback only; never reset or re-admit a daily import.
+
+    This is intentionally not exposed through the scheduler or HTTP routes.
+    Public downloads can be reachable from the operator's computer even when
+    the hosting network receives a redirect/access denial.
+    """
+    at = now()
+    async with db.Session.begin() as session:
+        await session.execute(insert(RuntimeLimit).values(key='control:paid', used=0).on_conflict_do_nothing())
+        await session.get(RuntimeLimit, 'control:paid', with_for_update=True)
+        daily = await session.get(RuntimeLimit, f'moneypuck-batch:{at.date()}')
+        failed = await session.get(ProviderState, STATUS_KEY)
+        probe = await session.get(ProviderState, PROBE_KEY)
+        cache = await session.get(ProviderState, CACHE_KEY)
+        eligible = (daily and daily.used == 1 and failed and failed.info.get('status') == 'failed'
+                    and failed.info.get('date') == str(at.date()) and probe
+                    and probe.info.get('date') == str(at.date())
+                    and timedelta(0) <= at-aware(probe.observed_at) <= timedelta(hours=1)
+                    and probe.info.get('status') == 'failed'
+                    and any(s.get('http_status') in {301,302,303,307,308,403}
+                            for s in probe.info.get('sources', [])))
+        if not eligible:
+            raise BudgetExceeded('Manual recovery requires today’s failed import and a recent failed source diagnostic')
+        if cache and cache.info.get('as_of_date') == str(at.date()):
+            raise BudgetExceeded('Current-day statistics are already saved; recovery is unnecessary')
+        await limits._increment(session, f'moneypuck-manual-recovery:{at.date()}', 1, 1)
+        await limits._increment(session, f'moneypuck-wire:{at:%Y-%m}', RESERVATION, settings.nhl_advanced_monthly_bytes)
+        session.add(AuditLog(action='NHL_MANUAL_RECOVERY_ADMITTED', entity_id='MoneyPuck',
+                            details={'wire_reserved': RESERVATION, 'mode': 'operator_public_download',
+                                     'original_daily_attempt_retained': True}))
+    return f'moneypuck-wire:{at:%Y-%m}', at.date()
+
+
+async def sync(*, transport=None, admission=None, acquisition='scheduled_public_download'):
     if not settings.nhl_advanced_enabled:
         return {"status": "disabled"}
     if db.Session is None:
@@ -306,6 +340,7 @@ async def sync(*, transport=None, admission=None):
                     # TemporaryDirectory cleanup (particularly on Windows).
                     await parse
                     raise
+        batch['acquisition'] = acquisition
         serialized = json.dumps(batch, separators=(",", ":"))
         if len(serialized.encode()) > 200_000:
             raise ValueError("NHL statistics cache exceeded byte cap")
@@ -322,7 +357,8 @@ async def sync(*, transport=None, admission=None):
             session.add(AuditLog(action="NHL_ADVANCED_IMPORT_SUCCEEDED", entity_id="MoneyPuck",
                                 details={"team_games": batch["team_games"], "wire_accounted": actual}))
         result = {"status": "succeeded", "date": str(day), "completed_at": now().isoformat(),
-                  "team_games": batch["team_games"], "wire_accounted": actual, "paid_credits": 0}
+                  "team_games": batch["team_games"], "wire_accounted": actual, "paid_credits": 0,
+                  "acquisition": acquisition}
         await limits.observe(STATUS_KEY, result)
         return result
     except (Exception, asyncio.CancelledError) as exc:
