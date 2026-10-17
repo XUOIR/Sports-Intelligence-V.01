@@ -120,3 +120,47 @@ cache is still October 15. The local ignored database configuration had not
 been repaired, so no successful recovery, new statistics or approved production
 recommendation is claimed. Production screenshot:
 `artifacts/nhl-gap-diagnosis-2026-10-16/source-diagnostic-live.jpg`.
+
+## Completed operator recovery after the local configuration update
+
+The owner updated the ignored local database URL. The next read-only check
+failed DNS resolution, rather than authentication: that update used the direct
+endpoint. The known project Session Pooler hostname resolved. Only the local
+connection's hostname/username were corrected to the established Session Pooler
+configuration, retaining and URL-encoding the owner-provided password. A fresh
+private `SELECT 1` then succeeded. No secret was displayed or committed, and no
+Render setting or database password was changed.
+
+The single authorized operator recovery succeeded at its recorded October 16
+17:24:30 Pacific completion time. Full parsing and official NHL reconciliation
+admitted 118 completed games, 32 teams and 65 goalie entries. The cache is now
+dated October 16 and verified through October 15. Its acquisition remains
+explicitly `operator_public_download`; source observation/publication timestamps
+and hashes were preserved. No prior snapshot/forecast was backdated.
+
+- Team source: 31,389,249 wire bytes, 127,128,038 decoded bytes;
+  SHA-256 `c0c25d3ecae3d68d533d143bec8a112e08398ebda62784dd34ede87ecc2a7c31`.
+- Goalie source: 53,887 wire bytes;
+  SHA-256 `f5455db6d0c82e4106e91d1a5b89e0af0777426016cda2984ab4df24709079fd`.
+- Transfer accounting for this completed recovery: 33,443,136 bytes, including
+  the conservative official-verification allowance. Monthly protected usage is
+  now 148,228,199 / 1,500,000,000 bytes.
+- Both original daily import admission and manual recovery admission remain at
+  one; neither was reset. Paid-call records remain today's earlier one odds
+  request / three units, with no AI generation.
+
+The live Settings page displays October 16 statistics and 148.2 MB protected
+monthly usage, with the prior failed Render diagnostic retained separately.
+Screenshot: `artifacts/nhl-gap-diagnosis-2026-10-16/statistics-restored-live.jpg`.
+Restoration does not mark any goalie confirmed or model approved; both import
+approval flags remain false. Render's source access remains unresolved, so this
+is a verified temporary recovery, not an unattended source-access fix.
+
+The live Pittsburgh–Colorado drawer explicitly showed MoneyPuck 5v5 expected
+goals/goalie GSAx as Available with the new observation, and matchup history
+through October 15. Daily cards retained their genuine paper probabilities and
+expired-price labels. The production model remained unapproved and no starter
+confirmation was submitted. The source observation was verified to be in the
+past using the database clock; timestamps were not adjusted. Additional proof:
+`artifacts/nhl-gap-diagnosis-2026-10-16/recovered-matchup-evidence-live.jpg`.
+The authenticated main dashboard was left open after closing the drawer.
