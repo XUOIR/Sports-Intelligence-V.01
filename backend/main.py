@@ -181,6 +181,20 @@ async def request_nhl_statistics(background_tasks:BackgroundTasks):
     background_tasks.add_task(nhl_advanced.sync,admission=admission)
     return {'status':'queued','paid_credits':0,'daily_import_limit':1}
 
+@app.post('/operations/nhl-statistics-probe',dependencies=[Depends(authorize)],status_code=202)
+async def request_nhl_source_probe(background_tasks:BackgroundTasks):
+    if not settings.nhl_advanced_enabled:
+        raise HTTPException(409,'NHL advanced statistics are not enabled')
+    if db.Session is None:
+        raise HTTPException(503,'Database is not configured')
+    try:
+        admission=await nhl_advanced.reserve_probe()
+    except BudgetExceeded:
+        raise HTTPException(429,'The daily source diagnostic or monthly transfer limit has been reached') from None
+    await limits.observe(nhl_advanced.PROBE_KEY,{'status':'queued','date':str(admission),'checked_at':now().isoformat(),'sources':[]})
+    background_tasks.add_task(nhl_advanced.probe_sources,admission=admission)
+    return {'status':'queued','paid_credits':0,'wire_reserved':nhl_advanced.PROBE_RESERVATION,'daily_limit':1}
+
 @app.get('/matches',dependencies=[Depends(authorize)])
 async def match_feed(date:str|None=None,session=Depends(database)):
     try:day=matches.selected_date(date)

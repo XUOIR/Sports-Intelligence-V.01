@@ -139,6 +139,89 @@ def test_import_diagnostics_never_publish_untrusted_exception_text():
     assert failure['retained_previous_cache'] is True
 
 
+async def test_bounded_probe_cannot_replace_cache_or_reset_imports(database,monkeypatch):
+    monkeypatch.setattr(advanced,'settings',replace(settings,nhl_advanced_enabled=True))
+    previous={'version':'prior valid cache'}
+    async with database.begin() as session:
+        session.add(ProviderState(provider=advanced.CACHE_KEY,info=previous))
+    await advanced.reserve_batch()
+    team,goalies,reference=source_files();calls=[]
+    result=await advanced.probe_sources(transport=transport_for(team,goalies,reference,calls))
+    assert result['status']=='complete' and result['paid_credits']==0
+    assert calls==[advanced.TEAM_URL,advanced.GOALIE_URL]
+    assert all(0<row['sample_bytes']<=advanced.PROBE_SAMPLE for row in result['sources'])
+    with pytest.raises(advanced.BudgetExceeded):
+        await advanced.probe_sources(transport=transport_for(team,goalies,reference,calls))
+    assert len(calls)==2
+    async with database() as session:
+        assert (await session.get(ProviderState,advanced.CACHE_KEY)).info==previous
+        assert (await session.get(RuntimeLimit,f'moneypuck-batch:{now().date()}')).used==1
+        assert (await session.get(RuntimeLimit,f'moneypuck-probe:{now().date()}')).used==1
+        assert (await session.get(RuntimeLimit,f'moneypuck-wire:{now():%Y-%m}')).used==advanced.RESERVATION+advanced.PROBE_RESERVATION
+        assert (await session.scalars(select(ProviderCall))).all()==[]
+
+
+async def test_probe_reports_http_failures_without_retry_or_body_exposure(database,monkeypatch):
+    monkeypatch.setattr(advanced,'settings',replace(settings,nhl_advanced_enabled=True))
+    calls=[]
+    def failed(request):
+        calls.append(str(request.url))
+        return httpx.Response(403,text='untrusted body secret-token')
+    result=await advanced.probe_sources(transport=httpx.MockTransport(failed))
+    assert result['status']=='failed' and len(calls)==2
+    assert all(row['http_status']==403 and row['reason']=='NHL file request failed; no retry' for row in result['sources'])
+    assert 'secret-token' not in str(result)
+    async with database() as session:
+        assert await session.get(ProviderState,advanced.CACHE_KEY) is None
+
+
+async def test_probe_monthly_admission_failure_consumes_no_daily_probe_slot(database,monkeypatch):
+    monkeypatch.setattr(advanced,'settings',replace(settings,nhl_advanced_enabled=True,nhl_advanced_monthly_bytes=advanced.PROBE_RESERVATION-1))
+    with pytest.raises(advanced.BudgetExceeded):await advanced.reserve_probe()
+    async with database() as session:
+        assert await session.get(RuntimeLimit,f'moneypuck-probe:{now().date()}') is None
+
+
+async def test_probe_closes_each_source_after_a_single_small_chunk(database,monkeypatch):
+    monkeypatch.setattr(advanced,'settings',replace(settings,nhl_advanced_enabled=True))
+    yielded={advanced.TEAM_URL:0,advanced.GOALIE_URL:0}
+    class LargeSource(httpx.AsyncByteStream):
+        def __init__(self,url):self.url=url
+        async def __aiter__(self):
+            prefix=gzip.compress(b'x'*200000) if self.url==advanced.TEAM_URL else b'PK\x03\x04'
+            for _ in range(100):
+                yielded[self.url]+=1
+                yield (prefix+b'0'*advanced.PROBE_SAMPLE)[:advanced.PROBE_SAMPLE]
+    def respond(request):
+        url=str(request.url)
+        headers={'Last-Modified':(now()-timedelta(hours=1)).strftime('%a, %d %b %Y %H:%M:%S GMT'),
+                 'Content-Length':str(100*advanced.PROBE_SAMPLE)}
+        if url==advanced.TEAM_URL:headers['Content-Encoding']='gzip'
+        return httpx.Response(200,headers=headers,stream=LargeSource(url))
+    result=await advanced.probe_sources(transport=httpx.MockTransport(respond))
+    assert result['status']=='complete'
+    assert list(yielded.values())==[1,1]
+    assert all(r['sample_bytes']==advanced.PROBE_SAMPLE for r in result['sources'])
+
+
+async def test_probe_route_is_private_and_cannot_readmit_same_day(database,monkeypatch):
+    import main
+    config=replace(settings,nhl_advanced_enabled=True)
+    monkeypatch.setattr(main,'settings',config);monkeypatch.setattr(advanced,'settings',config)
+    admissions=[]
+    async def fake_probe(**kwargs):admissions.append(kwargs['admission'])
+    monkeypatch.setattr(advanced,'probe_sources',fake_probe)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=main.app),base_url='http://test') as client:
+        assert (await client.post('/operations/nhl-statistics-probe')).status_code==401
+        assert admissions==[]
+        headers={'Authorization':'Bearer '+config.admin_token}
+        first=await client.post('/operations/nhl-statistics-probe',headers=headers)
+        assert first.status_code==202 and first.json()['paid_credits']==0
+        assert len(admissions)==1
+        assert (await client.post('/operations/nhl-statistics-probe',headers=headers)).status_code==429
+        assert len(admissions)==1
+
+
 async def test_detail_read_is_cache_only_truthfully_stale_and_does_not_modify_fixture(database,monkeypatch):
     monkeypatch.setattr(advanced,'settings',replace(settings,nhl_advanced_enabled=True))
     batch={'schema_version':1,'model_approved_by_import':False,'as_of_date':(now().date()-timedelta(days=1)).isoformat(),

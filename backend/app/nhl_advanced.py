@@ -39,6 +39,9 @@ MAX_REFERENCE = 2_000_000
 RESERVATION = MAX_TEAM_WIRE + MAX_GOALIE_WIRE + MAX_REFERENCE
 CACHE_KEY = "nhl-advanced-statistics"
 STATUS_KEY = "nhl-advanced-import"
+PROBE_KEY = 'nhl-advanced-probe'
+PROBE_RESERVATION = 2_000_000
+PROBE_SAMPLE = 8192
 log = logging.getLogger('nhl-statistics')
 SAFE_IMPORT_REASONS = frozenset({
     'NHL file request failed; no retry', 'Required bandwidth-safe encoding unavailable',
@@ -51,6 +54,7 @@ SAFE_IMPORT_REASONS = frozenset({
     "Previous day's NHL games are not all final", 'NHL sources do not reconcile',
     'Team and goalie files have different game coverage', 'Official NHL verification request failed',
     'NHL verification byte cap exceeded', 'NHL statistics cache exceeded byte cap',
+    'Source sample is not a ZIP file', 'Source sample is not valid gzip', 'Empty source sample',
 })
 
 
@@ -59,6 +63,93 @@ def import_failure(exc, stage):
     reason = str(exc) if isinstance(exc, ValueError) and str(exc) in SAFE_IMPORT_REASONS else 'Import did not complete; inspect the stage and error category.'
     return {'status': 'failed', 'stage': stage, 'category': type(exc).__name__, 'reason': reason,
             'failed_at': now().isoformat(), 'retained_previous_cache': True}
+
+
+def source_headers(response, *, compressed, observed):
+    if response.status_code != 200:
+        raise ValueError('NHL file request failed; no retry')
+    encoding = response.headers.get('content-encoding', 'identity').lower()
+    if compressed and encoding != 'gzip' or not compressed and encoding != 'identity':
+        raise ValueError('Required bandwidth-safe encoding unavailable')
+    length = response.headers.get('content-length')
+    cap = MAX_TEAM_WIRE if compressed else MAX_GOALIE_WIRE
+    if length is not None and (not length.isdigit() or int(length) > cap):
+        raise ValueError('NHL file transport cap exceeded')
+    modified = response.headers.get('last-modified')
+    published = aware(parsedate_to_datetime(modified)) if modified else None
+    if published is None or published > observed or observed-published > timedelta(hours=48):
+        raise ValueError('NHL file publication time is missing, future or too old')
+    return length, published
+
+
+async def reserve_probe():
+    """A bounded diagnostic is separate from, and cannot reset, import admission."""
+    at = now()
+    async with db.Session.begin() as session:
+        await session.execute(insert(RuntimeLimit).values(key='control:paid', used=0).on_conflict_do_nothing())
+        await session.get(RuntimeLimit, 'control:paid', with_for_update=True)
+        await limits._increment(session, f'moneypuck-probe:{at.date()}', 1, 1)
+        await limits._increment(session, f'moneypuck-wire:{at:%Y-%m}', PROBE_RESERVATION, settings.nhl_advanced_monthly_bytes)
+        session.add(AuditLog(action='NHL_SOURCE_PROBE_ADMITTED', entity_id='MoneyPuck',
+                            details={'wire_reserved': PROBE_RESERVATION, 'source_requests': 2}))
+    return at.date()
+
+
+async def probe_sources(*, transport=None, admission=None):
+    if not settings.nhl_advanced_enabled:
+        return {'status': 'disabled', 'paid_credits': 0}
+    day = admission or await reserve_probe()
+    result = {'status': 'running', 'date': str(day), 'checked_at': now().isoformat(), 'sources': [],
+              'paid_credits': 0, 'wire_reserved': PROBE_RESERVATION,
+              'note': 'Transport samples only. No statistics imported, goalie confirmed or model approved.'}
+    await limits.observe(PROBE_KEY, result)
+    try:
+        async with asyncio.timeout(25):
+            async with httpx.AsyncClient(timeout=10, follow_redirects=False, transport=transport,
+                                        headers={'User-Agent': 'G-Sports-private-statistics/0.1'}) as client:
+                for kind, url, compressed in [('team', TEAM_URL, True), ('goalie', GOALIE_URL, False)]:
+                    observed = now()
+                    row = {'source': kind, 'observed_at': observed.isoformat()}
+                    try:
+                        async with client.stream('GET', url, headers={'Accept-Encoding': 'gzip' if compressed else 'identity'}) as response:
+                            row.update(http_status=response.status_code,
+                                       encoding=response.headers.get('content-encoding', 'identity'),
+                                       content_length=response.headers.get('content-length'),
+                                       last_modified=response.headers.get('last-modified'))
+                            _, published = source_headers(response, compressed=compressed, observed=observed)
+                            row['published_at'] = published.isoformat()
+                            # Close the response after one small raw chunk. Never
+                            # consume or cache a complete source in this operation.
+                            sample = b''
+                            async for chunk in response.aiter_raw(chunk_size=PROBE_SAMPLE):
+                                sample = chunk
+                                break
+                            if not sample:
+                                raise ValueError('Empty source sample')
+                            if compressed:
+                                try:
+                                    zlib.decompressobj(31).decompress(sample, PROBE_SAMPLE)
+                                except zlib.error:
+                                    raise ValueError('Source sample is not valid gzip') from None
+                            elif not sample.startswith(b'PK\x03\x04'):
+                                raise ValueError('Source sample is not a ZIP file')
+                            row.update(status='sample_available', sample_bytes=len(sample))
+                    except Exception as exc:
+                        failure = import_failure(exc, kind + '_transport')
+                        row.update(status='failed', reason=failure['reason'], category=failure['category'])
+                    result['sources'].append(row)
+        result['status'] = 'complete' if all(r['status']=='sample_available' for r in result['sources']) else 'failed'
+    except (Exception, asyncio.CancelledError) as exc:
+        failure = import_failure(exc, 'transport_probe')
+        result.update(status='failed', reason=failure['reason'], category=failure['category'])
+        await limits.observe(PROBE_KEY, result)
+        if isinstance(exc, asyncio.CancelledError):
+            raise
+    result['completed_at'] = now().isoformat()
+    # Keep the conservative reservation even on success: TCP/read-ahead can
+    # exceed the tiny sample returned by HTTPX. Never refund an uncertain call.
+    await limits.observe(PROBE_KEY, result)
+    return result
 
 
 async def download(client, url, path, *, compressed=False):
@@ -71,18 +162,7 @@ async def download(client, url, path, *, compressed=False):
     observed = now()
     async with asyncio.timeout(90 if compressed else 20):
         async with client.stream("GET", url, headers={"Accept-Encoding": "gzip" if compressed else "identity"}) as response:
-            if response.status_code != 200:
-                raise ValueError("NHL file request failed; no retry")
-            encoding = response.headers.get("content-encoding", "identity")
-            if compressed and encoding != "gzip" or not compressed and encoding != "identity":
-                raise ValueError("Required bandwidth-safe encoding unavailable")
-            length = response.headers.get("content-length")
-            if length is not None and (not length.isdigit() or int(length) > cap):
-                raise ValueError("NHL file transport cap exceeded")
-            modified = response.headers.get("last-modified")
-            published = aware(parsedate_to_datetime(modified)) if modified else None
-            if published is None or published > observed or observed - published > timedelta(hours=48):
-                raise ValueError("NHL file publication time is missing, future or too old")
+            length, published = source_headers(response, compressed=compressed, observed=observed)
             decoder = zlib.decompressobj(31) if compressed else None
             with path.open("wb") as target:
                 async for raw in response.aiter_raw(chunk_size=65536):

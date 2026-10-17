@@ -45,6 +45,8 @@ async def operational_status(session):
     advanced_wire=await session.get(RuntimeLimit,f'moneypuck-wire:{at:%Y-%m}')
     advanced_state=await session.get(ProviderState,'nhl-advanced-import')
     advanced_cache=await session.get(ProviderState,'nhl-advanced-statistics')
+    advanced_probe=await session.get(ProviderState,'nhl-advanced-probe')
+    advanced_probe_limit=await session.get(RuntimeLimit,f'moneypuck-probe:{at.date()}')
     providers=[]
     for provider,enabled,cap in [('odds',bool(settings.odds_key and settings.odds_daily_credits),settings.odds_daily_credits),
         ('openrouter',settings.llm_enabled,settings.llm_daily_requests),
@@ -82,6 +84,8 @@ async def operational_status(session):
     return {'active_sports':list(settings.active_sports),'paid_paused':paused,'providers':providers,
         'nhl_scores':{'daily_used':score_budget.used if score_budget else 0,'daily_cap':settings.nhl_score_daily_requests,'paid_credits':0},
         'nhl_statistics':{'enabled':settings.nhl_advanced_enabled,'status':advanced_state.info.get('status') if advanced_state else 'pending',
+            'source_probe':{'daily_used':advanced_probe_limit.used if advanced_probe_limit else 0,'daily_limit':1,
+                'last':advanced_probe.info if advanced_probe else None},
             'failure_stage':advanced_state.info.get('stage') if advanced_state and advanced_state.info.get('status')=='failed' else None,
             'failure_reason':advanced_state.info.get('reason') if advanced_state and advanced_state.info.get('status')=='failed' else None,
             'daily_imports_used':advanced_batch.used if advanced_batch else 0,'daily_imports_cap':1,
