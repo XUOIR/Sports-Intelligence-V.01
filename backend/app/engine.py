@@ -132,6 +132,8 @@ async def evaluate(fixture_id: str):
             return
         metrics = fixture.metrics
         confirmed_at = metrics.get("confirmed_at")
+        review_at = metrics.get('review_confirmed_at', confirmed_at)
+        review_current = current_timestamp(review_at,now(),timedelta(minutes=30))
         personnel = metrics.get("personnel_confirmed") is True and current_timestamp(confirmed_at,now(),timedelta(minutes=30))
         if fixture.sport in {"CS2","VAL","LOL"}:
             personnel = personnel and metrics.get("roster_complete") is True
@@ -166,8 +168,8 @@ async def evaluate(fixture_id: str):
         gates = {key: False for key in GATE_NAMES}
         gates.update(personnel=personnel, form=len(snapshot.vector) == 15,
             maps_veto=fixture.sport == "NHL" or metrics.get("maps_veto_verified") is True,
-            other_markets=metrics.get("other_markets_verified") is True,
-            opposing_case=metrics.get("opposing_case_verified") is True, probability=probability_ok,
+            other_markets=review_current and metrics.get("other_markets_verified") is True,
+            opposing_case=review_current and metrics.get("opposing_case_verified") is True, probability=probability_ok,
             overlap_exposure=not duplicate and bankroll > 0 and exposure < bankroll*MAX_OPEN_EXPOSURE)
         edge = None
         suggested = Decimal(0)
@@ -221,6 +223,9 @@ async def evaluate(fixture_id: str):
         if not current_timestamp(confirmed_at,now(),timedelta(minutes=30)):
             gates["personnel"]=False
             personnel=False
+        if not current_timestamp(review_at,now(),timedelta(minutes=30)):
+            gates['other_markets']=False
+            gates['opposing_case']=False
         fixture.gates = gates
         fixture.metrics={**fixture.metrics,'recommendation_verified_at':now().isoformat(),'recommendation_baseline_digest':baseline_digest(fixture.sport),
             'recommended_quote_source_at':aware(chosen[0].source_at).isoformat() if chosen else None}

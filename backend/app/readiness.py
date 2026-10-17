@@ -21,6 +21,7 @@ def fresh_recommendation(fixture):
             and all(fixture.gates.get(key) is True for key in ('price','personnel','form','maps_veto','other_markets','opposing_case','overlap_exposure','probability'))
             and timedelta(0)<=now()-aware(metrics['recommendation_verified_at'])<=timedelta(minutes=5)
             and timedelta(0)<=now()-aware(metrics['recommended_quote_source_at'])<=timedelta(minutes=5)
+            and timedelta(0)<=now()-aware(metrics.get('review_confirmed_at',metrics.get('confirmed_at')))<=timedelta(minutes=30)
             and timedelta(0)<=now()-aware(metrics['confirmed_at'])<=timedelta(minutes=30))
     except (KeyError,TypeError,ValueError):return False
 

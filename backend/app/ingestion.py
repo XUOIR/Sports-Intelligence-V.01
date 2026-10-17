@@ -70,9 +70,14 @@ async def ingest_nhl_personnel():
             if candidates:
                 current.metrics={**current.metrics,'nhl_goalie_comparison':candidates}
             if all(confirmations.values()):
-                current.metrics={**current.metrics,"personnel_confirmed":True,"confirmed_at":now().isoformat(),"goalie_confirmations":confirmations}
+                # Keep independent review freshness when an official update arrives.
+                current.metrics={**current.metrics,
+                    'review_confirmed_at':current.metrics.get('review_confirmed_at',current.metrics.get('confirmed_at')),
+                    "personnel_confirmed":True,"confirmed_at":now().isoformat(),"goalie_confirmations":confirmations,
+                    'starter_confirmation_method':'official_feed','starter_source_url':None,
+                    'goalie_confirmation_ids':{},'manual_starter_request_id':None,'starter_reported_at':None}
                 dirty(current,"Official starter confirmations changed")
-            elif current.metrics.get("source_reference"):
+            elif current.metrics.get("source_reference") or current.metrics.get('starter_confirmation_method')=='manual_operator':
                 # Preserve still-current operator evidence; absence in a feed does not contradict it.
                 continue
             else:

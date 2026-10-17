@@ -74,7 +74,7 @@ async def detail(session, fixture, snapshot, quotes, statistics):
     prices_current = bool(pair and at - pair[0] <= timedelta(minutes=5))
     metrics = fixture.metrics
     personnel = metrics.get('personnel_confirmed') is True and current_timestamp(metrics.get('confirmed_at'), at, timedelta(minutes=30))
-    review_current = current_timestamp(metrics.get('confirmed_at'), at, timedelta(minutes=30))
+    review_current = current_timestamp(metrics.get('review_confirmed_at', metrics.get('confirmed_at')), at, timedelta(minutes=30))
     model = await session.scalar(select(ModelValidation).where(ModelValidation.sport == 'NHL', ModelValidation.approved.is_(True))
         .order_by(ModelValidation.created_at.desc()).limit(1))
     model_ok = validated_model(model, snapshot) if snapshot_ok else validated_model(model)
@@ -93,8 +93,9 @@ async def detail(session, fixture, snapshot, quotes, statistics):
                      f'PlayNow prices received. The validated model must exceed break-even by at least {MIN_EDGE * 100:g} percentage points.')
     checks = [check('price', 'PlayNow price & edge', price_message, prices_current and model_ok),
               check('personnel', 'Confirmed starting goalies',
-                    'Both starters have a current confirmation source.' if personnel else
-                    'The NHL comparison lists goalie candidates, not confirmed starters. Record a current team confirmation.', personnel),
+                    ('Both starters are currently confirmed by you. This is a manual attestation.' if metrics.get('starter_confirmation_method')=='manual_operator'
+                     else 'Both starters have a current confirmation source.') if personnel else
+                    'Choose each team’s starter in Starting Goalies and select Confirm Selection.', personnel),
               check('form', 'Form & rest',
                     'Prior completed regular-season games are available. Inputs freeze at T−30.' if form else form_error,
                     form is not None),

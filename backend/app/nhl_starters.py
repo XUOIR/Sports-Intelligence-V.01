@@ -1,6 +1,46 @@
 """Saved-data goalie previews. Estimates never supply confirmation evidence."""
 from datetime import timedelta
+import hashlib
+import json
 from .clock import aware, now
+
+MANUAL_CONTRACT = 'nhl-manual-starters-v1'
+
+
+def selection_options(fixture, statistics, at):
+    """Identified team candidates from saved reads; no roster/availability claim."""
+    saved = fixture.metrics.get('nhl_goalie_comparison', {})
+    try:
+        fresh = timedelta(0) <= at-aware(saved['observed_at']) <= timedelta(hours=2)
+    except (KeyError, TypeError, ValueError):
+        fresh = False
+    try:
+        stats_fresh = ((statistics or {}).get('status') == 'available'
+            and timedelta(0) <= at-aware(statistics['observed_at']) <= timedelta(hours=26))
+    except (KeyError, TypeError, ValueError):
+        stats_fresh = False
+    sides = {}
+    times = []
+    for side in ('home', 'away'):
+        rows = {}
+        if stats_fresh:
+            for goalie in statistics.get('sides', {}).get(side, {}).get('goalies', []):
+                if fixture.metrics.get(side+'_abbrev') and goalie.get('latest_team') == fixture.metrics.get(side+'_abbrev'):
+                    rows[goalie['player_id']] = {'player_id': goalie['player_id'], 'name': goalie['name'],
+                        'candidate_source': 'saved_team_history'}
+            times.append(statistics['observed_at'])
+        if fresh:
+            for goalie in saved.get('sides', {}).get(side, []):
+                rows[goalie['player_id']] = {'player_id': goalie['player_id'], 'name': goalie['name'],
+                    'candidate_source': 'nhl_comparison'}
+            times.append(saved['observed_at'])
+        sides[side] = sorted((row for row in rows.values()
+            if isinstance(row['player_id'], str) and len(row['player_id']) == 7 and row['player_id'].isdigit()
+            and isinstance(row['name'], str) and 2 <= len(row['name']) <= 100), key=lambda row: row['name'])
+    identity = {'fixture_id': fixture.id, 'start_at': aware(fixture.commence_time).isoformat(),
+                'sides': sides, 'observed_at': sorted(set(times))}
+    version = hashlib.sha256(json.dumps(identity, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+    return {'version': version, 'sides': sides, 'observed_at': max(times, key=aware) if times else None}
 
 
 def comparison(payload, fixture, at):
@@ -82,10 +122,13 @@ def preview(fixture, statistics, at=None):
             'projected_name': pick['name'] if pick else None, 'candidates': candidates, 'reason': reason,
             'confirmed_at': fixture.metrics.get('confirmed_at') if confirmed else None,
             'reported_at': fixture.metrics.get('starter_reported_at') if confirmed else None,
-            'source_url': fixture.metrics.get('source_reference') if confirmed else None}
+            'source_url': fixture.metrics.get('starter_source_url', fixture.metrics.get('source_reference')) if confirmed else None,
+            'confirmation_method': fixture.metrics.get('starter_confirmation_method', 'public_source') if confirmed else None,
+            'confirmed_player_id': fixture.metrics.get('goalie_confirmation_ids', {}).get(side) if confirmed else None}
     return {'contract': 'nhl-workload-preview-v1', 'sides': sides,'checked_at':at.isoformat(),
+        'selection': selection_options(fixture, statistics, at),
         'projection_valid_until':(aware(saved['observed_at'])+timedelta(hours=2)).isoformat() if fresh else None,
-        'note': 'Projections are unvalidated estimates. Comparison lists are not verified active rosters or injury reports. Games played include relief appearances. Only a sourced confirmation can satisfy the starter check.',
+        'note': 'Choose one known team goalie per side, then confirm that they are today’s starters. Manual confirmations are your attestation, not an independent news report. Candidate lists and workload projections do not establish availability.',
         'paid_credits': 0, 'grants_verification': False}
 
 

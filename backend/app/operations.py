@@ -47,6 +47,7 @@ async def operational_status(session):
     advanced_cache=await session.get(ProviderState,'nhl-advanced-statistics')
     advanced_probe=await session.get(ProviderState,'nhl-advanced-probe')
     advanced_probe_limit=await session.get(RuntimeLimit,f'moneypuck-probe:{at.date()}')
+    advanced_automation=await session.get(ProviderState,'nhl-advanced-automation')
     providers=[]
     for provider,enabled,cap in [('odds',bool(settings.odds_key and settings.odds_daily_credits),settings.odds_daily_credits),
         ('openrouter',settings.llm_enabled,settings.llm_daily_requests),
@@ -88,6 +89,10 @@ async def operational_status(session):
                 'last':advanced_probe.info if advanced_probe else None},
             'failure_stage':advanced_state.info.get('stage') if advanced_state and advanced_state.info.get('status')=='failed' else None,
             'failure_reason':advanced_state.info.get('reason') if advanced_state and advanced_state.info.get('status')=='failed' else None,
+            'failure_transport':advanced_state.info.get('transport') if advanced_state and advanced_state.info.get('status')=='failed' else None,
+            'automation':advanced_automation.info if advanced_automation else None,
+            'cache_acquisition':advanced_cache.info.get('acquisition') if advanced_cache else None,
+            'verified_through':advanced_cache.info.get('verified_through') if advanced_cache else None,
             'daily_imports_used':advanced_batch.used if advanced_batch else 0,'daily_imports_cap':1,
             'bytes_monthly_used':advanced_wire.used if advanced_wire else 0,'bytes_monthly_cap':settings.nhl_advanced_monthly_bytes,
             'observed_at':aware(advanced_cache.observed_at) if advanced_cache else None,

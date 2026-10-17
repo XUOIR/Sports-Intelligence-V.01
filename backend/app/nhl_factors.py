@@ -9,7 +9,7 @@ import unicodedata
 from .clock import aware
 from .maths import decimal
 
-CONTRACT='nhl-normalized-factors-v2'
+CONTRACT='nhl-normalized-factors-v3'
 
 
 def clip(value):return max(Decimal(-1),min(Decimal(1),value))
@@ -24,10 +24,21 @@ def normalized_factors(context, starters, form, anchor):
     sources=context.get('sources',{})
     if set(sources)!={'team','goalie'} or any(aware(s['observed_at'])>at or aware(s['published_at'])>at for s in sources.values()):
         raise ValueError('Pre-anchor source publication/observation required')
-    if (not starters.get('payload',{}).get('confirmed') is True
-            or not at-timedelta(minutes=30)<=aware(starters['source_at'])<=aware(starters['observed_at'])<=at
-            or not starters['payload'].get('source_url','').startswith('https://')):
+    payload=starters.get('payload',{})
+    manual=payload.get('confirmation_method')=='manual_operator'
+    if (not payload.get('confirmed') is True
+            or not at-timedelta(minutes=30)<=aware(starters['source_at'])<=aware(starters['observed_at'])<=at):
         raise ValueError('Both confirmed starters require current pre-anchor evidence')
+    if manual:
+        from .nhl_starters import MANUAL_CONTRACT
+        if (payload.get('contract')!=MANUAL_CONTRACT or payload.get('source_url') is not None
+                or payload.get('reported_at') is not None or not payload.get('request_id')
+                or aware(payload['fixture_start_at'])!=at+timedelta(minutes=30)
+                or not timedelta(0)<=aware(starters['source_at'])-aware(payload['candidate_observed_at'])<=timedelta(hours=26)
+                or aware(starters['source_at'])!=aware(starters['observed_at'])):
+            raise ValueError('Manual starter evidence must retain its actual confirmation and candidate provenance')
+    elif not str(payload.get('source_url','')).startswith('https://'):
+        raise ValueError('Public starter confirmation requires a source URL')
     published=starters['payload'].get('reported_at')
     if published and not aware(published)<=aware(starters['source_at']):
         raise ValueError('Starter report must precede its actual re-verification')
@@ -46,7 +57,8 @@ def normalized_factors(context, starters, form, anchor):
     for side in ('home','away'):
         team=sample(context['teams'][side]);code=team['team']
         matches=[g for g in context['goalie_candidates'] if g.get('latest_team')==code
-                 and name(g.get('name'))==name(starters['payload'].get(side))]
+                 and name(g.get('name'))==name(starters['payload'].get(side))
+                 and (not manual or g.get('player_id')==payload.get('player_ids',{}).get(side))]
         if len(matches)!=1:raise ValueError('Confirmed starter must match exactly one same-team goalie')
         goalie=sample(matches[0]);ice=decimal(goalie['ice_time_seconds'])
         if ice<=0:raise ValueError('Positive goalie exposure required')

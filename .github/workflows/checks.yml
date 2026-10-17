@@ -10,7 +10,11 @@ jobs:
           python-version: "3.12"
       - run: pip install -r backend/requirements.lock
       - run: pip install --no-deps -e backend
-      - run: python -m pytest backend/tests -q
+      - run: python -m pytest tests -q
+        working-directory: backend
+      - run: pip install -r backend/research/requirements.txt
+      - run: python -m unittest research.tests.test_paper_consistency -q
+        working-directory: backend
       - uses: pnpm/action-setup@v4
         with:
           version: "11.25.0"

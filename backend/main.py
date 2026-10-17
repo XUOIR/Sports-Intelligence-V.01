@@ -177,8 +177,9 @@ async def request_nhl_statistics(background_tasks:BackgroundTasks):
         admission=await nhl_advanced.reserve_batch()
     except BudgetExceeded as exc:
         raise HTTPException(429,'The daily import or monthly transfer limit has been reached') from None
-    await limits.observe(nhl_advanced.STATUS_KEY,{'status':'queued','date':str(admission[1]),'queued_at':now().isoformat()})
-    background_tasks.add_task(nhl_advanced.sync,admission=admission)
+    await limits.observe(nhl_advanced.STATUS_KEY,{'status':'queued','date':str(admission[1]),'queued_at':now().isoformat(),
+                                              'acquisition':'manual_render_download'})
+    background_tasks.add_task(nhl_advanced.sync,admission=admission,acquisition='manual_render_download')
     return {'status':'queued','paid_credits':0,'daily_import_limit':1}
 
 @app.post('/operations/nhl-statistics-probe',dependencies=[Depends(authorize)],status_code=202)
@@ -350,6 +351,57 @@ async def settle(bet_id: str, body: Settlement, session=Depends(database)):
             dirty(fixture,"Bankroll changed after settlement")
         return serialize(bet)
 
+class ManualGoaliesInput(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    request_id: UUID
+    candidate_version: str = Field(pattern=r'^[a-f0-9]{64}$')
+    home_player_id: str = Field(pattern=r'^[0-9]{7}$')
+    away_player_id: str = Field(pattern=r'^[0-9]{7}$')
+
+
+@app.post('/fixtures/{fixture_id}/starting-goalies', dependencies=[Depends(authorize)])
+async def confirm_starting_goalies(fixture_id: str, body: ManualGoaliesInput, session=Depends(database)):
+    from app.nhl_starters import selection_options, MANUAL_CONTRACT
+    async with session.begin():
+        fixture = await session.get(Fixture, fixture_id, with_for_update=True)
+        if fixture is None:
+            raise HTTPException(404, 'Fixture not found')
+        at = now()
+        if fixture.sport != 'NHL' or 'NHL' not in settings.active_sports or aware(fixture.commence_time) <= at:
+            raise HTTPException(409, 'Manual starter confirmation is available only before an active NHL game starts')
+        ids = {side: getattr(body, side+'_player_id') for side in ('home', 'away')}
+        metrics = fixture.metrics
+        if metrics.get('manual_starter_request_id') == str(body.request_id):
+            if metrics.get('goalie_confirmation_ids') != ids:
+                raise HTTPException(409, 'This confirmation request was already saved with different goalies')
+            return safe_fixture(fixture)
+        statistics = await nhl_advanced.detail(session, fixture)
+        options = selection_options(fixture, statistics, at)
+        if options['version'] != body.candidate_version:
+            raise HTTPException(409, 'The saved goalie list changed or expired. Reload this match and confirm the current selections')
+        pair = {side: next((row for row in options['sides'][side] if row['player_id'] == ids[side]), None)
+                for side in ('home', 'away')}
+        if not all(pair.values()) or ids['home'] == ids['away']:
+            raise HTTPException(422, 'Choose one identified goalie from each team’s list')
+        names = {side: pair[side]['name'] for side in pair}
+        payload = {'contract': MANUAL_CONTRACT, 'confirmed': True, **names,
+            'player_ids': ids, 'confirmation_method': 'manual_operator', 'source_url': None, 'reported_at': None,
+            'fixture_id': fixture.id, 'fixture_start_at': aware(fixture.commence_time).isoformat(),
+            'candidate_version': options['version'], 'candidate_observed_at': options['observed_at'],
+            'candidate_lists': options['sides'],
+            'request_id': str(body.request_id)}
+        session.add(Evidence(fixture_id=fixture.id, kind='nhl_starters', source_at=at, observed_at=at, payload=payload))
+        # Preserve the real time of an earlier market/opposing-case review. A
+        # starter confirmation must never renew those independent checks.
+        fixture.metrics = {**metrics, 'review_confirmed_at': metrics.get('review_confirmed_at', metrics.get('confirmed_at')),
+            'personnel_confirmed': True, 'confirmed_at': at.isoformat(), 'goalie_confirmations': names,
+            'goalie_confirmation_ids': ids, 'starter_confirmation_method': 'manual_operator',
+            'starter_source_url': None, 'starter_reported_at': None, 'manual_starter_request_id': str(body.request_id)}
+        dirty(fixture, 'Starting goalies manually confirmed; other readiness checks still apply')
+        session.add(AuditLog(action='MANUAL_NHL_STARTERS', entity_id=fixture.id, details=payload))
+        return safe_fixture(fixture)
+
+
 class EvidenceInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
     source_at: datetime
@@ -417,7 +469,9 @@ async def verified_evidence(fixture_id: str, body: EvidenceInput, session=Depend
             factors = {k:float(v) for k,v in body.factors.items()}
             session.add(Evidence(fixture_id=fixture_id,kind="model_factors",source_at=source,observed_at=now(),payload=factors))
         fixture.metrics = {**fixture.metrics, "factors":factors,"personnel_confirmed":body.personnel_confirmed,
-            "confirmed_at":source.isoformat(), "roster_complete":roster_ok,
+            "confirmed_at":source.isoformat(), "review_confirmed_at":source.isoformat(), "roster_complete":roster_ok,
+            'starter_confirmation_method':'public_source', 'starter_source_url':body.source_reference,
+            'goalie_confirmation_ids':{}, 'manual_starter_request_id':None,
             'starter_reported_at':aware(body.starter_reported_at).isoformat() if body.starter_reported_at else None,
             "goalie_confirmations":{'home':body.home_goalie,'away':body.away_goalie} if fixture.sport=='NHL' else fixture.metrics.get('goalie_confirmations',{}),
             "other_markets_verified":body.other_markets_verified,"opposing_case_verified":body.opposing_case_verified,

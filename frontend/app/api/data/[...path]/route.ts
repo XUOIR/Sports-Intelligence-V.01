@@ -11,7 +11,7 @@ async function proxy(request: NextRequest,{params}:{params:Promise<{path:string[
     || path.length===2 && ['fixtures','bets'].includes(path[0])
     || path.length===2 && path[0]==='operations' && ['pause','resume','allowances','odds-refresh','nhl-statistics-refresh','nhl-statistics-probe'].includes(path[1])
     || path.length===3 && path[0]==='operations' && path[1]==='odds-refresh'
-    || path.length===3 && path[0]==='fixtures' && path[2]==='evidence';
+    || path.length===3 && path[0]==='fixtures' && ['evidence','starting-goalies'].includes(path[2]);
   if(!allowed || path.some(p=>!/^[-a-zA-Z0-9_:]+$/.test(p)))return NextResponse.json({detail:'Unknown endpoint'},{status:404});
   const base=process.env.BACKEND_URL || (process.env.BACKEND_HOST?`http://${process.env.BACKEND_HOST}:${process.env.BACKEND_PORT||'10000'}`:undefined);
   if(!base)return NextResponse.json({detail:'Backend connection is not configured'},{status:503});

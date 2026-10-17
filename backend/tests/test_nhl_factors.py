@@ -81,3 +81,20 @@ def test_strength_rates_sum_exposure_and_exclude_target_day_and_playoffs():
     assert Decimal(result['power_play']['xgf_per_60'])==6
     assert result['home_venue']['sample_games']==3
     assert result['away_venue']['status']=='insufficient_sample'
+
+
+def test_manual_attestation_can_normalize_only_with_matching_ids_and_real_observation():
+    from app.nhl_starters import MANUAL_CONTRACT
+    stats,starters,form,at=inputs()
+    for index,goalie in enumerate(stats['goalie_candidates']):goalie['player_id']=str(8480001+index)
+    starters['payload'].update(contract=MANUAL_CONTRACT,confirmation_method='manual_operator',source_url=None,reported_at=None,
+        player_ids={'home':'8480001','away':'8480002'},request_id='manual-test',fixture_start_at=(at+timedelta(minutes=30)).isoformat(),
+        candidate_observed_at=starters['source_at'])
+    result=normalized_factors(stats,starters,form,at)
+    assert result['contract']=='nhl-normalized-factors-v3' and result['approved_for_prediction'] is False
+    assert result['starter_evidence']['payload']['confirmation_method']=='manual_operator'
+    starters['payload']['player_ids']['home']='8480002'
+    with pytest.raises(ValueError):normalized_factors(stats,starters,form,at)
+    starters['payload']['player_ids']['home']='8480001'
+    starters['payload']['fixture_start_at']=(at+timedelta(hours=1)).isoformat()
+    with pytest.raises(ValueError):normalized_factors(stats,starters,form,at)

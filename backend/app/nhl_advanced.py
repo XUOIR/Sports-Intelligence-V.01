@@ -26,6 +26,7 @@ from .clock import now, aware
 from .config import settings
 from .limits import limits, BudgetExceeded
 from .models import ProviderState, RuntimeLimit, AuditLog
+from .nhl_source_diagnostics import SourceResponseError, response_metadata
 from .nhl_data import (TEAM_FIELDS, GOALIE_FIELDS, csv_rows, validate_team, validate_goalie,
                        rolling, team_context, pair_checks, goalie_checks, nhl_checks)
 
@@ -40,6 +41,7 @@ RESERVATION = MAX_TEAM_WIRE + MAX_GOALIE_WIRE + MAX_REFERENCE
 CACHE_KEY = "nhl-advanced-statistics"
 STATUS_KEY = "nhl-advanced-import"
 PROBE_KEY = 'nhl-advanced-probe'
+AUTOMATION_KEY = 'nhl-advanced-automation'
 PROBE_RESERVATION = 2_000_000
 PROBE_SAMPLE = 8192
 log = logging.getLogger('nhl-statistics')
@@ -61,24 +63,32 @@ SAFE_IMPORT_REASONS = frozenset({
 def import_failure(exc, stage):
     # Publish only our fixed validation messages, never upstream bodies/URLs.
     reason = str(exc) if isinstance(exc, ValueError) and str(exc) in SAFE_IMPORT_REASONS else 'Import did not complete; inspect the stage and error category.'
-    return {'status': 'failed', 'stage': stage, 'category': type(exc).__name__, 'reason': reason,
-            'failed_at': now().isoformat(), 'retained_previous_cache': True}
+    failure = {'status': 'failed', 'stage': stage, 'category': type(exc).__name__, 'reason': reason,
+               'failed_at': now().isoformat(), 'retained_previous_cache': True}
+    if isinstance(exc, SourceResponseError):
+        failure['transport'] = exc.diagnostics
+    return failure
 
 
-def source_headers(response, *, compressed, observed):
+def source_headers(response, *, compressed, observed, source_url=None):
+    def reject(message):
+        raise SourceResponseError(message, response_metadata(response, source_url=source_url))
     if response.status_code != 200:
-        raise ValueError('NHL file request failed; no retry')
+        reject('NHL file request failed; no retry')
     encoding = response.headers.get('content-encoding', 'identity').lower()
     if compressed and encoding != 'gzip' or not compressed and encoding != 'identity':
-        raise ValueError('Required bandwidth-safe encoding unavailable')
+        reject('Required bandwidth-safe encoding unavailable')
     length = response.headers.get('content-length')
     cap = MAX_TEAM_WIRE if compressed else MAX_GOALIE_WIRE
     if length is not None and (not length.isdigit() or int(length) > cap):
-        raise ValueError('NHL file transport cap exceeded')
+        reject('NHL file transport cap exceeded')
     modified = response.headers.get('last-modified')
-    published = aware(parsedate_to_datetime(modified)) if modified else None
+    try:
+        published = aware(parsedate_to_datetime(modified)) if modified else None
+    except (ValueError, TypeError, OverflowError):
+        published = None
     if published is None or published > observed or observed-published > timedelta(hours=48):
-        raise ValueError('NHL file publication time is missing, future or too old')
+        reject('NHL file publication time is missing, future or too old')
     return length, published
 
 
@@ -112,11 +122,8 @@ async def probe_sources(*, transport=None, admission=None):
                     row = {'source': kind, 'observed_at': observed.isoformat()}
                     try:
                         async with client.stream('GET', url, headers={'Accept-Encoding': 'gzip' if compressed else 'identity'}) as response:
-                            row.update(http_status=response.status_code,
-                                       encoding=response.headers.get('content-encoding', 'identity'),
-                                       content_length=response.headers.get('content-length'),
-                                       last_modified=response.headers.get('last-modified'))
-                            _, published = source_headers(response, compressed=compressed, observed=observed)
+                            row.update(response_metadata(response, source_url=url))
+                            _, published = source_headers(response, compressed=compressed, observed=observed, source_url=url)
                             row['published_at'] = published.isoformat()
                             # Close the response after one small raw chunk. Never
                             # consume or cache a complete source in this operation.
@@ -162,7 +169,7 @@ async def download(client, url, path, *, compressed=False):
     observed = now()
     async with asyncio.timeout(90 if compressed else 20):
         async with client.stream("GET", url, headers={"Accept-Encoding": "gzip" if compressed else "identity"}) as response:
-            length, published = source_headers(response, compressed=compressed, observed=observed)
+            length, published = source_headers(response, compressed=compressed, observed=observed, source_url=url)
             decoder = zlib.decompressobj(31) if compressed else None
             with path.open("wb") as target:
                 async for raw in response.aiter_raw(chunk_size=65536):
@@ -250,6 +257,34 @@ def build_batch(team_path, goalie_path, day, reference, sources):
             "team_context":contexts,"model_approved_by_import": False, "starters_confirmed_by_import": False}
 
 
+async def record_import_state(result, acquisition):
+    await limits.observe(STATUS_KEY, {**result, 'acquisition': acquisition})
+    if acquisition != 'scheduled_public_download':
+        return
+    at = now()
+    async with db.Session.begin() as session:
+        # The daily admission already serializes import attempts. This lock also
+        # makes same-result writes idempotent for automation-health accounting.
+        await session.execute(insert(ProviderState).values(provider=AUTOMATION_KEY, observed_at=at, info={})
+                              .on_conflict_do_nothing())
+        row = await session.get(ProviderState, AUTOMATION_KEY, with_for_update=True)
+        info = dict(row.info)
+        day = date.fromisoformat(result['date'])
+        status = result['status']
+        if status == 'succeeded' and info.get('last_success_date') != str(day):
+            adjacent = info.get('last_success_date') == str(day-timedelta(days=1))
+            info['consecutive_success_days'] = info.get('consecutive_success_days', 0)+1 if adjacent else 1
+            info.update(last_success_date=str(day), last_success_at=result['completed_at'])
+        elif status == 'failed':
+            info.update(consecutive_success_days=0, last_failure_at=result['failed_at'],
+                        last_failure={'stage': result['stage'], 'reason': result['reason'],
+                                      'category': result['category'], 'transport': result.get('transport')})
+        info.update(last_status=status, last_attempt_date=str(day), last_attempt_at=at.isoformat(),
+                    verification_target_days=3)
+        info.setdefault('consecutive_success_days', 0)
+        row.info, row.observed_at = info, at
+
+
 async def reserve_batch():
     at = now()
     async with db.Session.begin() as session:
@@ -305,7 +340,7 @@ async def sync(*, transport=None, admission=None, acquisition='scheduled_public_
     if not date(2026,7,1) <= now().date() < date(2027,7,1):
         raise BudgetExceeded("The 2026 NHL source contract requires a season update")
     monthly_key, day = admission or await reserve_batch()
-    await limits.observe(STATUS_KEY, {"status": "running", "started_at": now().isoformat(), "date": str(day)})
+    await record_import_state({"status": "running", "started_at": now().isoformat(), "date": str(day)}, acquisition)
     stage = 'team_download'
     try:
         async with asyncio.timeout(180):
@@ -359,11 +394,11 @@ async def sync(*, transport=None, admission=None, acquisition='scheduled_public_
         result = {"status": "succeeded", "date": str(day), "completed_at": now().isoformat(),
                   "team_games": batch["team_games"], "wire_accounted": actual, "paid_credits": 0,
                   "acquisition": acquisition}
-        await limits.observe(STATUS_KEY, result)
+        await record_import_state(result, acquisition)
         return result
     except (Exception, asyncio.CancelledError) as exc:
         failure = {**import_failure(exc, stage), 'date': str(day)}
-        await limits.observe(STATUS_KEY, failure)
+        await record_import_state(failure, acquisition)
         log.warning('NHL statistics import failed at %s: %s (%s)', stage, failure['reason'], failure['category'])
         if isinstance(exc, asyncio.CancelledError):
             raise
