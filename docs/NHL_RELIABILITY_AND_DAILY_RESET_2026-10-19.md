@@ -101,8 +101,36 @@ with a saved official fixture outcome. No real bankroll or ticket was changed.
 
 No Odds API refresh or AI generation was issued during this work. At the audit,
 the day's ledger still had only the two earlier successful odds requests,
-reserving six credits total. Production deploy and UI verification follow the
-tested commit; final release identifiers are recorded below once verified.
+reserving six credits total. The verified production release identifiers are
+recorded below.
+
+## Verified live release
+
+Commit `6583afd4e3261bfa3f65c2fdc9e19fe9d084cf23` is live on both services in
+the previously authorized Terry's workspace:
+
+- Backend `dep-dbban5c9v7es73ehgf9g`, live at 23:46:16 UTC.
+- Dashboard `dep-dbbanpvf3r2c7386cu90`, live at 23:47:44 UTC.
+
+Backend liveness/readiness and frontend sign-in returned HTTP 200. No new Render
+error logs appeared in the checked post-release window. No migration, hosting
+plan change or secret update was required.
+
+Authenticated Settings visibly shows **2 of 5 used today · 3 remaining**, with
+the next reset **October 20, 12:00 a.m. Pacific**. The actual live screenshot is
+`artifacts/nhl-reliability-2026-10-19/daily-reset-live.jpg`. The separate
+`midnight-reset-local.jpg` records the explicitly simulated component check,
+which is not a live reset of production allowances.
+
+The recovered goalie collector also completed its next regular scheduled check
+at **4:46 p.m. PT**, matching four games; the pilot remained active at 44/100
+daily source requests. This is a verified recovery and one following scheduled
+success, not proof of permanent source reliability. The earlier missed pregame
+coverage remains missing. Both frozen forecast versions and their saved counts
+remain intact. Actual new-game results still await official finals.
+
+Authenticated Overview also shows the baseline paper label on all four existing
+Daily Matchups cards. No additional selector, chart or page was introduced.
 
 ## Owner actions
 
