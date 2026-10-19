@@ -17,7 +17,7 @@ export default function GoalieSourceReport({report,clock,home,away}:{report?:Rep
         {row.reporter_url&&<a className="text-button" href={row.reporter_url} target="_blank" rel="noreferrer">Reporter Reference ↗</a>}
       </div>;
     })}
-    <p className="nhl-statistics-note">{report.observed_at?`Checked ${pacificTime(report.observed_at)} PT. `:''}{report.pregame===false?'Observed after the game started; review only. ':''}Test reports leave your selections and verification gates unchanged.</p>
+    <p className="nhl-statistics-note">{report.observed_at?`Checked ${pacificTime(report.observed_at)} PT. `:''}{report.pregame===false?'Game has started; review only. ':''}Test reports leave your selections and verification gates unchanged.</p>
     {report.source_url&&<a className="text-button" href={report.source_url} target="_blank" rel="noreferrer">Daily Faceoff Source ↗</a>}
   </aside>;
 }

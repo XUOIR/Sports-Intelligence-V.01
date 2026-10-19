@@ -70,9 +70,53 @@ retractions/removals, ETags, failures/redirects, compressed oversized bodies,
 interruptions, pause/resume/deadline persistence, auth and cache-only GET routes.
 The unmodified paper model passes its offline consistency checks.
 
-Deployment and actual source checks are recorded below after release. Passing
-local/mock tests does not establish reliable Render access or multi-day coverage.
+The final backend suite passed **315 tests**, including 39 collector checks.
+The frontend passed **29 tests** and its production build. The frozen paper
+candidate also passed its two existing offline consistency checks. Passing
+local/mock tests does not establish reliable multi-day access or source accuracy.
 Source reuse terms remain unverified; this test is not a claimed API licence.
+
+## Actual release and first collection
+
+- Backend commit `49a8bf2eacb14dd0965293b5e5ce2a526fc1e8b1` is live on
+  `sports-intelligence-api`; deploy `dep-dbanehlg1s2s73cpjsm0`. The existing
+  migration/pre-deploy stage completed, and `/health/live` and `/health/ready`
+  returned HTTP 200. No schema migration or service-plan change was required.
+- The frontend's initial collector release on the same commit reached live;
+  deploy `dep-dbaneics728c738rfoo0`. A final display-only refinement preserves
+  the gradient heading and describes a started game without claiming when the
+  report was first observed. Its release is recorded after verification below.
+- The requested bounded pilot was activated through the authorized project
+  connection at **October 18, 6:53:33 p.m. PT**, with an audit entry. The original
+  deadline is **October 21, 6:53:33 p.m. PT**. The stored deadline was formatted
+  in the application's Pacific-time convention without changing its instant.
+- The production scheduler admitted the first check and completed it at
+  **October 18, 6:53:47 p.m. PT**. It fetched the public crawler policy and dated
+  HTML page successfully, matched both games and stored two immutable report
+  revisions. Zero source games were unmatched.
+- Saved source reports: Minnesota — Jesper Wallstedt; Columbus — Cam Talbot;
+  Calgary — Devin Cooley; Carolina — Brandon Bussi. Daily Faceoff labeled all
+  four confirmed, and all four matched unambiguous saved NHL player IDs. These
+  are source-reported labels, not new manual confirmations or approved plays.
+- Both games had started before this first observation. The reports are
+  review-only, and no report was backdated to a pregame decision. The scheduler
+  remains idle for the rest of tonight unless explicitly checked; ordinary
+  collection resumes only within the next day's upcoming-game window.
+- The first successful check consumed **2 request reservations** and **22,766
+  source-body bytes** after the unused reservation was released. The saved
+  October Odds API allowance remained **12 credits**. No paid odds refresh or
+  AI generation was issued. No service error logs appeared in the checked
+  post-release window.
+- The actual components were inspected in an isolated, noninteractive layout
+  preview using the saved production test facts. This confirms layout and
+  Pacific deadline formatting. Authenticated visual verification on the live
+  dashboard remains pending the owner's sign-in; a preview is not that check.
+
+One successful collection establishes cloud reachability for this route at
+that time. The remaining pilot checks are repeated pregame coverage, changes
+from expected to confirmed, conflicts/retractions, observation latency and
+multi-day failure behavior. The test expires automatically; it does not extend
+itself. Source-report storage never makes an unvalidated prediction actionable.
 
 ## Owner actions
 

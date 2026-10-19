@@ -20,7 +20,7 @@ export default function GoaliePilot({status,onUpdated}:{status:Pilot;onUpdated:(
     catch(caught){setError((caught as Error).message);onUpdated();}finally{setBusy(false);}
   }
   const label=({not_started:'NOT STARTED',active:'TEST RUNNING',paused:'PAUSED',halted:'STOPPED AFTER FAILURE',expired:'TEST EXPIRED'})[phase];
-  return <section className="operations-card" aria-label="Daily Faceoff goalie pilot">
+  return <section className="operations-card goalie-pilot" aria-label="Daily Faceoff goalie pilot">
     <div className="card-heading"><div><span className="eyebrow">NHL STARTER SOURCE · REPORTS ONLY</span><h2>Daily Faceoff Test Feed</h2></div><span className={`badge ${status.phase==='halted'?'hold':'watch'}`}>{label}</span></div>
     <p className="card-description">A private 72-hour test of the public starting-goalies page. Reports appear beside your manual selections. They do not confirm starters, change forecasts or start AI reviews.</p>
     {status.reason&&<p className="notice" role="status">{status.reason} No automatic retry is scheduled.</p>}

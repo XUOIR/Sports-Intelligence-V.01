@@ -34,3 +34,4 @@
 .goalie-pilot-actions{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin:18px 0}.goalie-source-report{margin:20px 0;padding:16px;border:1px solid var(--border);border-radius:12px;background:linear-gradient(130deg,#3b82f608,#8b5cf60b)}.goalie-source-report h4{margin:0!important;background:var(--gradient);background-clip:text;-webkit-text-fill-color:transparent}.goalie-source-report .text-button{font-size:11px}.goalie-source-report .nhl-statistics-heading{flex-wrap:wrap}.goalie-source-report .badge{font-size:8px}
 
 .goalie-source-report .account-readout{display:flex;flex-direction:column;gap:6px;margin:14px 0;padding:12px 0;border-top:1px solid var(--border)}.goalie-source-report .account-readout b,.goalie-source-report .account-readout span{font-size:11px}.goalie-source-report .account-readout small{font-size:10px;line-height:1.6;color:var(--muted)}
+.goalie-pilot h2{background:var(--gradient);background-clip:text;-webkit-text-fill-color:transparent}
