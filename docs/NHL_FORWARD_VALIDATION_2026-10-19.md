@@ -215,6 +215,26 @@ The new comparison and candidate forecasts are placed before the original
 ledger. Both complete histories remain available in bounded scrollable tables;
 the sticky match feed, theme and existing information are preserved.
 
+The final frontend layout is live at commit
+`9db8247cc674a898100847b8617acb903ae72ad0`, deploy
+`dep-dbb87gnavr4c73d49or0` (completed 20:56:32 UTC). The backend remains on the
+tested functional commit above. At 1:59 p.m. PT the normal scheduled goalie
+check succeeded for all four upcoming games, creating four unchanged-source
+observation receipts. Its original October 21, 6:53 p.m. PT expiry remains in
+place; no extra manual check, deadline reset or paid request was needed.
+
+Authenticated live screenshots are saved locally under the ignored directory
+`artifacts/nhl-forward-validation-2026-10-19/`:
+
+- `forward-comparison-live.jpg`: per-cohort forward comparison.
+- `candidate-forecasts-live.jpg`: today's frozen forecasts and saved prices.
+- `guarded-refresh-live.jpg`: successful guarded snapshot and remaining slots.
+
+At the narrow browser width, full forecast tables can scroll horizontally and
+vertically. All rows and decision/result columns remain accessible. The saved
+prices are now correctly labelled expired in the live match feed; historical
+paper observations do not extend their executable freshness.
+
 **Urgent:** no provider purchase or key is required. Use the guarded odds refresh
 near a useful pregame window if current PlayNow comparisons are needed. A single
 refresh supplies both paper cohorts and consumes three provider credits.
