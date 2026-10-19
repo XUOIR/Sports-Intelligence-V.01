@@ -7,4 +7,6 @@
 .nhl-validation .market-panel>.fine-print,.nhl-validation .validation-checkpoints,.nhl-validation .validation-research,.nhl-validation .metrics-grid{margin-left:24px;margin-right:24px}
 .nhl-validation .validation-checkpoints{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
 .nhl-validation .validation-research{padding:15px 0;border-top:1px solid var(--border)}.nhl-validation summary{font-size:12px;color:#9bb7f8;cursor:pointer}
+.nhl-validation .validation-candidate-table{max-height:560px;overflow:auto;scrollbar-width:thin;scrollbar-color:#464453 transparent}
+.nhl-validation .validation-candidate-table thead{position:sticky;top:0;z-index:1;background:var(--panel)}
 @media(max-width:700px){.nhl-validation .validation-checkpoints{grid-template-columns:1fr}.nhl-validation .market-heading h2{font-size:20px}.nhl-validation td{font-size:11px}}

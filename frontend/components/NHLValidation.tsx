@@ -53,7 +53,7 @@ export default function NHLValidation({data}:{data:ForwardValidation}){
     {candidate&&<section className="market-panel" aria-label="xG candidate forecasts">
       <div className="market-heading"><h2>xG Candidate Forecasts</h2><span className="badge watch">SEPARATE COHORT</span></div>
       <p className="fine-print">Every forecast below was saved at its actual pregame collection time. Five prior games are required for each statistics window. The original baseline forecasts remain intact. Saved edges describe the price at observation time, not a current offer.</p>
-      <div className="table-scroll"><table><thead><tr><th>MATCHUP / PT</th><th>HOME / AWAY</th><th>SAVED PLAYNOW / EDGE</th><th>PAPER DECISION</th><th>RESULT</th></tr></thead><tbody>
+      <div className="table-scroll validation-candidate-table" tabIndex={0} aria-label="Scrollable candidate forecast history"><table><thead><tr><th>MATCHUP / PT</th><th>HOME / AWAY</th><th>SAVED PLAYNOW / EDGE</th><th>PAPER DECISION</th><th>RESULT</th></tr></thead><tbody>
         {[...candidate.records].sort((a,b)=>Number(Boolean(b.captured_at))-Number(Boolean(a.captured_at))||a.start_at.localeCompare(b.start_at)).map(row=><tr key={row.fixture_id}>
           <td>{row.away} at {row.home}<small>{pacificTime(row.start_at)} PT</small></td>
           <td>{row.home_probability==null?'Awaiting inputs':`${percent(Number(row.home_probability))} / ${percent(1-Number(row.home_probability))}`}<small>{row.captured_at?`Saved ${pacificTime(row.captured_at)} PT`:row.issue}</small></td>

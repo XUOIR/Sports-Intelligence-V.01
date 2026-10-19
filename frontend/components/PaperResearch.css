@@ -15,3 +15,5 @@
 .paper-research th:nth-child(5){width:14%}
 @media(max-width:1000px){.with-match-feed .paper-research>.metrics-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.paper-research table{min-width:650px}.paper-research>.fine-print,.paper-research>.notice{margin:14px 16px}.with-match-feed .paper-research>.metrics-grid{margin:14px 16px}.paper-research .market-heading{gap:10px;flex-wrap:wrap}}
+.paper-research .table-scroll{max-height:620px;overflow:auto;scrollbar-width:thin;scrollbar-color:#464453 transparent}
+.paper-research thead{position:sticky;top:0;z-index:1;background:var(--panel)}

@@ -169,9 +169,51 @@ the dashboard preserves MoneyPuck attribution.
 
 ## Verification and owner actions
 
-Local test results, deployment IDs, actual source/price observations and live
-screenshots are recorded after release below. Statistical validation requires
-future games to happen; no result is filled in early to complete a checklist.
+Local verification passed: **348 backend tests**, **29 frontend tests**, the
+Next.js production build, and **5 research/runtime consistency and acquisition
+checks**. Both frozen model integrity checks passed; the original baseline hash
+remains unchanged. The API read test requires authentication and proves that a
+performance request does not fetch a provider or create a forecast.
+
+Commit `2efb7268c4e34b7dc3cfb31eeb4107ca3ce5dbb8` is live on both services:
+backend deploy `dep-dbb83rajnfac738c8psg`, frontend deploy
+`dep-dbb84dtg1s2s738ieedg`. Backend liveness/readiness and the frontend sign-in
+page returned HTTP 200 after release. No new service error logs appeared in the
+checked post-release window. No schema migration or hosting-plan change was
+required. Authenticated interface and price results are recorded below.
+
+The frontend release switch interrupted the first manual price request before
+the Odds API admission. The saved request was checked, no new ProviderCall or
+credit reservation existed, and the UI returned to four remaining slots. The
+request was not blindly repeated. After both services were live, a new explicit
+guarded snapshot was requested for the genuine saved paper forecasts.
+
+Statistical validation requires future games to happen; no result is filled in
+early to complete a checklist.
+
+The guarded snapshot completed at **1:51 p.m. PT**: **48 quotes**, including
+**24 PlayNow quotes**, from **15 matched games**, for **exactly three credits**.
+The provider reported **482 credits remaining**. App reservations showed
+**6 / 15 credits today**, **18 / 500 this month**, and **3 / 5 refresh slots
+remaining**. No AI generation was requested. Both cohorts share this snapshot.
+
+The candidate recorded eligible fresh pairs for all four October 19 games.
+None reached its declared +3 percentage-point threshold, so it recorded zero
+paper positions at that observation. A no-play outcome is permitted. These
+saved edges remain historical when the five-minute price window expires.
+
+Authenticated live verification confirmed the candidate probabilities, saved
+price/source times and signed edges, separate per-version scoring, probability
+calibration, and goalie coverage/actual-starter tables. The original cohort has
+24 genuine forecasts, 20 resolved games, Brier 0.2223 and 70% directional accuracy
+at this check. Only two resolved price pairs and one settled paper position
+exist; market superiority is not demonstrated, and the paper position lost.
+The candidate has four saved forecasts and no finals yet. No future outcome,
+closing quote or goalie accuracy was fabricated to populate an empty metric.
+
+The new comparison and candidate forecasts are placed before the original
+ledger. Both complete histories remain available in bounded scrollable tables;
+the sticky match feed, theme and existing information are preserved.
 
 **Urgent:** no provider purchase or key is required. Use the guarded odds refresh
 near a useful pregame window if current PlayNow comparisons are needed. A single
