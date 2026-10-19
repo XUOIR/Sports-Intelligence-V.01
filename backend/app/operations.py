@@ -32,6 +32,7 @@ async def reported_ai_usage(session, at):
     return result
 
 async def operational_status(session):
+    from .nhl_goalie_pilot import status as goalie_pilot_status
     at=now()
     rows=(await session.scalars(select(RuntimeLimit).where(RuntimeLimit.key.in_([
         'control:paid',*[f'circuit:{p}' for p in ('odds','openrouter','pandascore')],
@@ -83,6 +84,7 @@ async def operational_status(session):
     factors=sum(set(f.metrics.get('factors',{}))==set(NHL_WEIGHTS) for f in future)
     usable=sum(s.baseline_home_probability is not None for s in snapshots)
     return {'active_sports':list(settings.active_sports),'paid_paused':paused,'providers':providers,
+        'nhl_goalie_pilot':await goalie_pilot_status(session),
         'nhl_scores':{'daily_used':score_budget.used if score_budget else 0,'daily_cap':settings.nhl_score_daily_requests,'paid_credits':0},
         'nhl_statistics':{'enabled':settings.nhl_advanced_enabled,'status':advanced_state.info.get('status') if advanced_state else 'pending',
             'source_probe':{'daily_used':advanced_probe_limit.used if advanced_probe_limit else 0,'daily_limit':1,

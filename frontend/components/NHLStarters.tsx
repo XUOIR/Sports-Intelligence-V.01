@@ -1,10 +1,11 @@
 'use client';
 import {useRef,useState} from 'react';
-import type {NHLStarterPreview} from '@/lib/types';
+import GoalieSourceReport from './GoalieSourceReport';
+import type {NHLStarterPreview,GoalieSourceReport as Report} from '@/lib/types';
 import {starterStatus} from '@/lib/starters.mjs';
 import {pacificTime} from '@/lib/time.mjs';
 
-export default function NHLStarters({data,home,away,clock,fixtureId,onSaved,canVerify=true}:{clock:number;data?:NHLStarterPreview|null;home:string;away:string;fixtureId:string;onSaved:()=>void|Promise<void>;canVerify?:boolean}){
+export default function NHLStarters({data,home,away,clock,fixtureId,onSaved,canVerify=true,report}:{report?:Report|null;clock:number;data?:NHLStarterPreview|null;home:string;away:string;fixtureId:string;onSaved:()=>void|Promise<void>;canVerify?:boolean}){
   const [selected,setSelected]=useState<Record<'home'|'away',string>>({home:data?.sides.home.confirmed_player_id||'',away:data?.sides.away.confirmed_player_id||''});
   const [saving,setSaving]=useState(false),[message,setMessage]=useState(''),[error,setError]=useState('');
   const requestId=useRef<string|null>(null);
@@ -55,6 +56,6 @@ export default function NHLStarters({data,home,away,clock,fixtureId,onSaved,canV
     <button className="outline-button" disabled={!canVerify||!selectionValid||saving} onClick={()=>void confirm()}>{saving?'Saving…':'Confirm Selection'}</button>
     <p className="nhl-statistics-note">{canVerify?'By confirming, you identify these two goalies as today’s starters. The app records your confirmation time automatically.':'The game has started. New pregame confirmations are closed.'}</p>
     {message&&<p className="notice" role="status">{message}</p>}{error&&<p className="notice" role="alert">{error}</p>}
-    <details><summary className="nhl-statistics-note">About Starter Data</summary><p className="nhl-statistics-note">{data.note} Daily Faceoff opens separately for reference; no automatic Daily Faceoff feed is connected. Saving this selection does not refresh odds or start an AI review.</p></details>
+    <GoalieSourceReport report={report} clock={clock} home={home} away={away}/><details><summary className="nhl-statistics-note">About Starter Data</summary><p className="nhl-statistics-note">{data.note} Daily Faceoff opens separately for reference; no automatic Daily Faceoff feed is connected. Saving this selection does not refresh odds or start an AI review.</p></details>
   </section>;
 }

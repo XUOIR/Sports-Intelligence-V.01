@@ -8,7 +8,7 @@ from sqlalchemy import select, text, delete
 from . import db
 from .clock import now, aware
 from .config import PACIFIC,settings
-from .models import Fixture, Snapshot, MarketOdds, Evidence, EvaluationCycle, RuntimeLimit, AuditLog
+from .models import Fixture, Snapshot, MarketOdds, Evidence, EvaluationCycle, RuntimeLimit, AuditLog, ProviderState
 from .limits import limits,BudgetExceeded
 from .ingestion import ingest_nhl, ingest_esports, ingest_results, ingest_nhl_personnel
 from .engine import freeze, evaluate
@@ -80,12 +80,19 @@ async def retain():
         cutoff = now()-timedelta(days=7)
         await session.execute(delete(MarketOdds).where(MarketOdds.created_at < cutoff))
         await session.execute(delete(Evidence).where(Evidence.observed_at < cutoff))
+        await session.execute(delete(ProviderState).where(
+            (ProviderState.provider.like('dfo:nhl:%') | ProviderState.provider.like('dfo-page:%')),
+            ProviderState.observed_at < now()-timedelta(days=8)))
         # Preserve snapshots/bets/audit history; attempt caps survive for fixture lifetime.
 
 def start():
     from .matches import tick as scores_tick
     from .nhl_paper import cycle as paper_cycle
+    from .nhl_goalie_pilot import collect as goalie_pilot_collect
     scheduler.add_job(scores_tick,'interval',seconds=30,next_run_time=now(),id='nhl-scores')
+    # Idle until explicitly started. The durable pilot deadline expires after
+    # 72 hours; every network admission retains its own shared ten-minute cap.
+    scheduler.add_job(guarded, 'interval', minutes=1, args=['nhl-goalie-pilot',goalie_pilot_collect,55], id='nhl-goalie-pilot')
     scheduler.add_job(guarded, CronTrigger(hour=4, minute=0, timezone=PACIFIC), args=["nhl-daily",daily_nhl,1800], id="nhl-daily")
     scheduler.add_job(guarded, "interval", hours=1, args=["nhl-refresh",refresh_nhl], id="nhl-refresh")
     if settings.nhl_advanced_enabled:

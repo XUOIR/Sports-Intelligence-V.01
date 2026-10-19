@@ -13,6 +13,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from decimal import Decimal
 from uuid import UUID
+from typing import Literal
 from urllib.parse import parse_qs,urlsplit
 from fastapi import FastAPI, Depends, HTTPException, Header, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
@@ -202,6 +203,34 @@ async def match_feed(date:str|None=None,session=Depends(database)):
     except ValueError as exc:raise HTTPException(422,str(exc)) from None
     return await matches.feed(session,day)
 
+
+class GoaliePilotInput(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    action: Literal['start','pause','resume','check']
+
+
+@app.post('/operations/nhl-goalie-pilot', dependencies=[Depends(authorize)], status_code=202)
+async def goalie_pilot_control(body: GoaliePilotInput, background_tasks: BackgroundTasks):
+    from app import nhl_goalie_pilot as pilot
+    if body.action != 'pause' and 'NHL' not in settings.active_sports:
+        raise HTTPException(409, 'The NHL phase is disabled')
+    if db.Session is None:
+        raise HTTPException(503, 'Database is not configured')
+    try:
+        await pilot.control(body.action)
+        if body.action == 'pause':
+            return {'status':'paused','mode':'shadow','paid_credits':0}
+        try:
+            admission = await pilot.reserve()
+        except BudgetExceeded:
+            if body.action == 'check':
+                raise
+            return {'status':'waiting','mode':'shadow','paid_credits':0}
+    except BudgetExceeded as exc:
+        raise HTTPException(429, str(exc)) from None
+    background_tasks.add_task(pilot.collect, manual=True, admission=admission)
+    return {'status':'queued','mode':'shadow','paid_credits':0}
+
 class MatchDateInput(BaseModel):
     model_config=ConfigDict(extra='forbid')
     date:str=Field(min_length=10,max_length=10)
@@ -262,8 +291,10 @@ async def fixture_detail(fixture_id: str, session=Depends(database)):
     snapshot = await session.get(Snapshot,fixture_id)
     statistics = await nhl_advanced.detail(session,fixture)
     from app.nhl_starters import preview
+    from app.nhl_goalie_pilot import detail as goalie_report
     return {"fixture":safe_fixture(fixture), "odds":[serialize(q) for q in quotes], "snapshot":serialize(snapshot) if snapshot else None,
             "nhl_statistics":statistics, "nhl_starters":preview(fixture,statistics) if fixture.sport=='NHL' else None,
+            'nhl_goalie_report':await goalie_report(session,fixture),
             "verification":await verification.detail(session,fixture,snapshot,quotes,statistics)}
 
 class WagerInput(BaseModel):
