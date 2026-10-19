@@ -255,15 +255,16 @@ async def test_official_ids_remain_identity_references_without_renewing_stale_st
         assert saved.gates=={} and saved.metrics=={**fixture.metrics,'nhl_goalie_comparison':{}}
 
 
-async def test_scheduled_collection_is_idle_after_start_and_postgame_manual_observations_stay_review_only(database,monkeypatch):
+async def test_initial_queued_check_can_observe_postgame_then_regular_schedule_stays_idle(database,monkeypatch):
     at=now();fixture=await seed(database,at)
     monkeypatch.setattr(pilot,'now',lambda:at)
     await pilot.control('start')
     later=at+timedelta(hours=3)
     monkeypatch.setattr(pilot,'now',lambda:later)
     calls=[]
-    assert (await pilot.collect(transport=transport(at,calls)))['status']=='idle' and not calls
-    assert (await pilot.collect(manual=True,transport=transport(at,calls)))['status']=='succeeded'
+    assert (await pilot.collect(transport=transport(at,calls)))['status']=='succeeded'
+    assert len(calls)==2
+    assert (await pilot.collect(transport=transport(at,calls)))['status']=='idle' and len(calls)==2
     async with database() as session:
         saved=await session.get(Fixture,fixture.id)
         assert (await pilot.detail(session,saved))['pregame'] is False

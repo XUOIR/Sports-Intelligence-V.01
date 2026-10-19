@@ -54,13 +54,15 @@ async def control(action):
         if action == 'start':
             if info.get('expires_at') and at < aware(info['expires_at']):
                 raise BudgetExceeded('The existing pilot is still active; its deadline is not extended')
-            info.update(paused=False, halted=False, reason=None, status='waiting', mode='shadow', expires_at=(at+timedelta(hours=72)).isoformat())
+            info.update(paused=False, halted=False, reason=None, status='waiting', mode='shadow',
+                        initial_check_pending=True, expires_at=(at+timedelta(hours=72)).isoformat())
         elif action == 'pause':
             info['paused'] = True
         elif action == 'resume':
             if not info.get('expires_at') or at >= aware(info['expires_at']):
                 raise BudgetExceeded('The pilot expired; start a new bounded test')
             info.update(paused=False, halted=False)
+            info['initial_check_pending']=True
             if info.get('reason'):
                 info['last_failure']={'reason':info['reason'],'at':info.get('failed_at')}
                 info['reason']=None
@@ -99,7 +101,8 @@ async def reserve():
                                     (DAILY_REQUESTS, DAILY_BYTES, MONTHLY_BYTES)):
             await limits._increment(session, key, amount, cap)
         attempt = str(uuid4())
-        info.update(status='running', started_at=at.isoformat(), next_at=(at+timedelta(seconds=INTERVAL)).isoformat(), attempt_id=attempt)
+        info.update(status='running', initial_check_pending=False, started_at=at.isoformat(),
+                    next_at=(at+timedelta(seconds=INTERVAL)).isoformat(), attempt_id=attempt)
         row.info, row.observed_at = info, at
         return {'attempt_id': attempt, 'keys': keys, 'reserved': requests*MAX_WIRE,
                 'need_robots': not current_robots, 'day': at.date()}
@@ -147,6 +150,8 @@ async def eligible():
         row = await session.get(ProviderState, CONTROL)
         if row is None or phase(row.info, at) != 'active':
             return False
+        if row.info.get('initial_check_pending') is True:
+            return True
         start = datetime.combine(at.date(), time.min, PACIFIC)
         return bool(await session.scalar(select(Fixture.id).where(Fixture.sport == 'NHL',
             Fixture.commence_time > at, Fixture.commence_time <= at+timedelta(hours=8),
