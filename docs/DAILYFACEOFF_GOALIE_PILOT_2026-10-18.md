@@ -110,8 +110,8 @@ Source reuse terms remain unverified; this test is not a claimed API licence.
   post-release window.
 - The actual components were inspected in an isolated, noninteractive layout
   preview using the saved production test facts. This confirms layout and
-  Pacific deadline formatting. Authenticated visual verification on the live
-  dashboard remains pending the owner's sign-in; a preview is not that check.
+  Pacific deadline formatting. Authenticated visual verification was completed
+  after the owner's sign-in on October 19, as recorded below.
 
 One successful collection establishes cloud reachability for this route at
 that time. The remaining pilot checks are repeated pregame coverage, changes
@@ -119,10 +119,49 @@ from expected to confirmed, conflicts/retractions, observation latency and
 multi-day failure behavior. The test expires automatically; it does not extend
 itself. Source-report storage never makes an unvalidated prediction actionable.
 
+## Authenticated live check — October 19, 2026
+
+The owner signed in, and the existing deployed dashboard was inspected directly.
+No implementation change, source-refresh button, odds refresh, AI generation,
+manual goalie confirmation or new deployment was needed for this verification.
+
+- Settings displayed the themed Daily Faceoff card, active test state, original
+  October 21 deadline, Pause Test, Check Now and Reload Test Status controls.
+  Its snapshot showed **18 source requests**, **0.47 MB today**, **0.50 MB this
+  month**, and **all four of today's games matched**. These are time-of-check
+  readings, not final daily totals; the existing scheduler continues collecting.
+- Anaheim at New York Rangers displayed **Ville Husso** and **Dylan Garand** as
+  Daily Faceoff's reported confirmed starters. The source update times were
+  October 19, **9:20 a.m.** and **10:30 a.m. PT** respectively; the saved collection
+  was checked at **11:09 a.m. PT**. Reporter links and saved NHL ID matches were
+  visible for both goalies. The pregame reports were labeled SOURCE REPORTS.
+- Both manual dropdowns remained unselected, Confirm Selection stayed disabled,
+  and the source card correctly said there was no current manual confirmation.
+  Verification remained pending and suggested stake remained zero. Merely
+  opening the panel did not confirm a goalie or authorize a play.
+- The daily matchup cards displayed genuine saved paper probabilities. Today's
+  PlayNow prices were absent, so signed price edges stayed unavailable. No odds
+  refresh was issued to populate those fields during the visual check.
+- Settings showed **zero odds and AI requests reserved today**, the existing
+  **US$3 monthly AI cap**, and **12 / 500 saved October odds credits**. Provider-side
+  AI billing was marked unavailable/stale; this check does not claim a newly
+  reconciled provider bill.
+- The MoneyPuck panel separately showed **3 / 3 consecutive successful scheduled
+  days**, today's 9:00 a.m. import, and completed results through October 18.
+  The October 16 failed diagnostic remained visibly dated rather than being
+  represented as today's result. This is download reliability, not model approval.
+
+Live screenshots are saved locally under
+`artifacts/dfo-goalie-pilot-2026-10-19/`: `test-controls-live.jpg` and
+`goalie-reports-live.jpg`. The latter replaces the isolated layout preview as
+evidence that the source card renders inside the authenticated live matchup.
+
 ## Owner actions
 
-**Urgent:** sign in to the dashboard when requested so the live interface can be
-checked. No API key, subscription or provider purchase is needed for this pilot.
+**Urgent:** none for the running source test. Sign-in and authenticated live
+visual verification are complete. No API key, subscription or provider purchase
+is needed for this pilot. Repeated pregame collection and accuracy checks remain
+part of the ongoing bounded evaluation, not an owner approval task.
 
 **Can Get To:** send the prepared Daily Faceoff enquiry asking about supported
 access, factual-status caching, research/model use and any published limits or
