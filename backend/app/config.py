@@ -50,6 +50,7 @@ class Settings:
     nhl_advanced_monthly_bytes: int = bounded_int('NHL_ADVANCED_MONTHLY_BYTES', 1_500_000_000, 0, 1_500_000_000)
     allowed_origin: str = os.getenv("FRONTEND_ORIGIN", "http://localhost:3000")
     dashboard_url: str = 'https://sports-intelligence-dashboard.onrender.com/'
+    # Legacy environment name retained; attempts now reset at Pacific midnight.
     odds_refreshes_24h: int = bounded_int('ODDS_REFRESHES_24H',5,0,5)
 
     @property

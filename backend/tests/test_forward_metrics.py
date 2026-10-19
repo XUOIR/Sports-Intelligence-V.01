@@ -85,3 +85,48 @@ async def test_nonclosing_quotes_cannot_be_labeled_closing_value(database):
         result=await cohort(s,'tested')
         assert result['positions']==1 and result['closing_pairs']==0
         assert result['mean_closing_value_percent'] is None
+
+
+@pytest.mark.asyncio
+async def test_official_settlement_grades_two_cohorts_independently_and_is_idempotent(database):
+    from app import nhl_paper
+    from app.models import Account,ProviderCall
+    start=now()-timedelta(hours=4)
+    captured=start-timedelta(hours=2)
+    observed=start-timedelta(minutes=40)
+    originals={}
+    async with database.begin() as s:
+        s.add(Fixture(id='nhl:2026020001',sport='NHL',home='Home',away='Away',
+            commence_time=start,final_home_win=True))
+        for version,p in [('baseline','.6'),('candidate','.4')]:
+            row=PaperForecast(fixture_id='nhl:2026020001',model_version=version,first_seen_at=captured,
+                captured_at=captured,start_at=start,home='Home',away='Away',home_probability=p,
+                inputs={'immutable_test_input':version})
+            s.add(row);await s.flush()
+            obs=PaperPriceObservation(forecast_id=row.id,identity='saved-pair',observed_at=observed,status='VALID',
+                data={'source_at':observed.isoformat(),'bookmaker':'playnow','home_odds':'2','away_odds':'2'})
+            s.add(obs);await s.flush()
+            home=float(p)>.5
+            row.position={'home':home,'selection':'Home' if home else 'Away','units':'1','odds':'2','bookmaker':'playnow',
+                'observation_id':obs.id,'source_at':observed.isoformat(),'observed_at':observed.isoformat()}
+            originals[row.id]=(row.captured_at,str(row.home_probability),dict(row.inputs),dict(row.position))
+    await nhl_paper.settle()
+    async with database() as s:
+        first_settled={r.id:r.settled_at for r in (await s.scalars(select(PaperForecast))).all()}
+    await nhl_paper.settle()
+    async with database() as s:
+        baseline,candidate=await cohort(s,'baseline'),await cohort(s,'candidate')
+        assert baseline['scores']['brier']==pytest.approx(.16)
+        assert candidate['scores']['brier']==pytest.approx(.36)
+        assert baseline['paired_market']['brier']==candidate['paired_market']['brier']==.25
+        assert baseline['roi_percent']==100 and candidate['roi_percent']==-100
+        assert baseline['resolved_price_pairs']==candidate['resolved_price_pairs']==1
+        for row in (await s.scalars(select(PaperForecast))).all():
+            before=originals[row.id]
+            assert row.captured_at==before[0] and float(row.home_probability)==float(before[1])
+            assert row.inputs==before[2] and row.position==before[3]
+            assert row.resolution=='FINAL' and row.result_home_win is True
+            assert row.settled_at==first_settled[row.id]
+        assert (await s.get(Account,1)).initial_bankroll==1100
+        assert (await s.scalars(select(PersonalBet))).all()==[]
+        assert (await s.scalars(select(ProviderCall))).all()==[]

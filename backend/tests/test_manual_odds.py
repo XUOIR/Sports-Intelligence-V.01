@@ -22,22 +22,89 @@ async def test_api_root_redirects_to_dashboard_without_database():
             result=await client.request(method,'/')
             assert result.status_code==307 and result.headers['location']=='https://sports-intelligence-dashboard.onrender.com/'
 
-async def test_five_attempts_rolling_across_midnight_and_restarts(database,monkeypatch):
+async def test_five_attempts_reset_at_pacific_midnight_without_erasing_ledger(database,monkeypatch):
     import app.limits as module
     at=datetime(2026,10,13,23,55,tzinfo=PACIFIC)
     monkeypatch.setattr(module,'now',lambda:at)
     for i in range(5):
         guard=Limits();ident=await guard.reserve('odds',3,identity=f'attempt:{i}');await guard.finish(ident,'SUCCEEDED')
-    at+=timedelta(minutes=10)
     window=await Limits().odds_window()
     assert window['used']==5 and window['remaining']==0
-    assert window['next_available_at']==datetime(2026,10,14,23,55,tzinfo=PACIFIC)
+    reset=datetime(2026,10,14,0,0,tzinfo=PACIFIC)
+    assert window['period']=='calendar_day' and window['timezone']=='America/Vancouver'
+    assert window['reset_at']==window['next_available_at']==reset
     with pytest.raises(BudgetExceeded):await Limits().reserve('odds',3,identity='sixth')
     assert not await Limits().attempted('odds','sixth')
-    at=datetime(2026,10,14,23,55,tzinfo=PACIFIC)
+    at=reset
+    window=await Limits().odds_window()
+    assert window['used']==0 and window['remaining']==5
+    assert window['reset_at']==datetime(2026,10,15,0,0,tzinfo=PACIFIC)
+    # A fresh guard/restart sees the same durable rows and midnight boundary.
+    for i in range(5):
+        guard=Limits();ident=await guard.reserve('odds',3,identity=f'next-day:{i}');await guard.finish(ident,'SUCCEEDED')
+    with pytest.raises(BudgetExceeded):await Limits().reserve('odds',3,identity='next-day:sixth')
+    with pytest.raises(BudgetExceeded):await Limits().reserve('odds',3,identity='attempt:0')
+    async with database() as session:
+        assert await session.scalar(select(func.count()).select_from(ProviderCall))==10
+        assert (await session.get(RuntimeLimit,'odds:2026-10-13')).used==15
+        assert (await session.get(RuntimeLimit,'odds:2026-10-14')).used==15
+        assert (await session.get(RuntimeLimit,'odds-month:2026-10')).used==30
+
+
+@pytest.mark.parametrize('at,hours',[
+    (datetime(2025,3,9,0,0,tzinfo=PACIFIC),23),
+    (datetime(2025,11,2,0,0,tzinfo=PACIFIC),25),
+])
+async def test_daily_reset_uses_calendar_midnight_on_short_and_long_days(database,monkeypatch,at,hours):
+    from datetime import timezone
+    import app.limits as module
+    monkeypatch.setattr(module,'now',lambda:at)
+    window=await Limits().odds_window()
+    assert window['reset_at'].hour==0
+    assert (window['reset_at'].astimezone(timezone.utc)-at.astimezone(timezone.utc)).total_seconds()==hours*3600
+    assert window['remaining']==5
+
+
+async def test_utc_midnight_does_not_reset_the_pacific_day(database,monkeypatch):
+    import app.limits as module
+    at=datetime(2026,10,19,16,59,tzinfo=PACIFIC)
+    monkeypatch.setattr(module,'now',lambda:at)
+    ident=await Limits().reserve('odds',3,identity='before-utc-midnight');await Limits().finish(ident,'SUCCEEDED')
+    at+=timedelta(minutes=2)
+    window=await Limits().odds_window()
+    assert window['used']==1 and window['remaining']==4
+    assert window['reset_at']==datetime(2026,10,20,0,0,tzinfo=PACIFIC)
+
+
+async def test_midnight_does_not_restore_monthly_credits(database,monkeypatch):
+    import app.limits as module
+    at=datetime(2026,10,19,23,59,tzinfo=PACIFIC)
+    monkeypatch.setattr(module,'now',lambda:at)
+    async with database.begin() as session:
+        session.add(RuntimeLimit(key='odds-month:2026-10',used=settings.odds_monthly_credits-2))
+    at+=timedelta(minutes=1)
     assert (await Limits().odds_window())['remaining']==5
-    await Limits().reserve('odds',3,identity='after-24-hours')
-    async with database() as session:assert await session.scalar(select(func.count()).select_from(ProviderCall))==6
+    with pytest.raises(BudgetExceeded):await Limits().reserve('odds',3,identity='monthly-exhausted')
+    assert not await Limits().attempted('odds','monthly-exhausted')
+
+
+async def test_midnight_keeps_unfinished_refresh_block_and_prevents_duplicate_request(database,monkeypatch):
+    import app.limits as module
+    at=datetime(2026,10,19,23,59,59,tzinfo=PACIFIC)
+    monkeypatch.setattr(module,'now',lambda:at)
+    ident=await Limits().reserve('odds',3,identity='before-midnight',fixture_id=f'odds-refresh:{uuid4()}')
+    at+=timedelta(seconds=2)
+    window=await Limits().odds_window()
+    assert window['used']==0 and window['remaining']==5 and window['in_progress']
+    with pytest.raises(BudgetExceeded):await Limits().reserve('odds',3,identity='blocked-after-midnight')
+    at+=timedelta(seconds=60)
+    assert (await Limits().odds_window())['needs_resume']
+    await Limits().resume('odds')
+    with pytest.raises(BudgetExceeded):await Limits().reserve('odds',3,identity='before-midnight')
+    await Limits().reserve('odds',3,identity='new-after-midnight')
+    async with database() as session:
+        assert (await session.get(ProviderCall,ident)).status=='UNKNOWN'
+        assert (await session.get(RuntimeLimit,'odds-month:2026-10')).used==6
 
 async def setup_quotes(database,monkeypatch,fail=False):
     config=replace(settings,odds_key='test-only',active_sports=('NHL',),odds_daily_credits=15)

@@ -10,6 +10,18 @@ export default function ManualOddsRefresh({window,disabled,onRequest,onCheck,onU
   const requestRef=useRef(onRequest),checkRef=useRef(onCheck),updateRef=useRef(onUpdated);
   const sending=useRef(false);
   requestRef.current=onRequest;checkRef.current=onCheck;updateRef.current=onUpdated;
+  useEffect(()=>{
+    const reset=Date.parse(window.reset_at||'');
+    if(!Number.isFinite(reset))return;
+    const server=Date.parse(window.as_of||'');
+    const due=Date.now()+Math.max(0,reset-(Number.isFinite(server)?server:Date.now()))+1000;
+    // Refresh saved data using the server's interval, never a provider request.
+    const reload=()=>updateRef.current();
+    const timer=setTimeout(reload,Math.max(250,due-Date.now()));
+    const visible=()=>{if(!document.hidden&&Date.now()>=due)reload();};
+    document.addEventListener('visibilitychange',visible);
+    return()=>{clearTimeout(timer);document.removeEventListener('visibilitychange',visible);};
+  },[window.reset_at,window.as_of]);
   useEffect(()=>{try{const saved=JSON.parse(localStorage.getItem(storage)||'null');if(saved&&/^[0-9a-f-]{36}$/i.test(saved.id)&&Number.isFinite(saved.started))setPending(saved);}catch{}},[]);
   const accept=useCallback((result:OddsRefreshResult,saved:Saved)=>{
     if(result.status==='in_progress'||result.status==='not_sent'&&Date.now()-saved.started<60000){setMessage('Checking the saved refresh. No second request will be sent.');return;}
@@ -30,11 +42,11 @@ export default function ManualOddsRefresh({window,disabled,onRequest,onCheck,onU
     }catch{setMessage('The request is saved. Only its status will be checked; it will not be resent.');updateRef.current();}
     finally{sending.current=false;setBusy(false);}
   }
-  return <div className="manual-odds"><div className="manual-odds-heading"><b>Manual NHL odds refresh</b><span>{window.remaining} / {window.limit} left</span></div>
-    <p>One refresh checks all upcoming NHL games and reserves {window.credit_cost} credits. Maximum {window.limit} attempts in any rolling 24 hours.</p>
+  return <div className="manual-odds"><div className="manual-odds-heading"><b>Manual NHL Odds Refresh</b><span>{window.used} of {window.limit} used today · {window.remaining} remaining</span></div>
+    <p>One refresh checks all upcoming NHL games and reserves {window.credit_cost} credits. Up to {window.limit} attempts per Pacific calendar day.</p>
     <button className="blue-button" disabled={busy||!pending&&(disabled||!window.remaining||window.in_progress||window.needs_resume)} onClick={()=>void action()}>{busy?'Checking…':pending?'Check saved refresh':'Refresh NHL odds'}</button>
-    {window.next_available_at&&<small>Next slot opens {pacificTime(window.next_available_at)} Pacific time.</small>}
-    {window.needs_resume&&<small>An interrupted refresh needs an explicit provider resume. Existing credits and slots remain consumed.</small>}
+    {window.reset_at&&<small>Daily allowance resets at 12:00 a.m. Pacific · next reset {pacificTime(window.reset_at)} PT. Monthly credits do not reset daily.</small>}
+    {window.needs_resume&&<small>An interrupted refresh needs an explicit provider resume. Midnight does not retry it or clear the provider pause; the earlier attempt remains recorded.</small>}
     {message&&<p role="status">{message}</p>}
     <small>Automatic odds refreshes are off. Reloading the dashboard uses stored data and does not spend odds credits.</small>
   </div>;

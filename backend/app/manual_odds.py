@@ -35,7 +35,7 @@ async def refresh(request_id):
             if settings.active_sports!=('NHL',):raise BudgetExceeded('Manual odds refresh is restricted to the NHL phase')
             if not settings.odds_key:raise ProviderError('Odds API credential is not configured')
             window=await limits.odds_window()
-            if not window['remaining']:raise BudgetExceeded('Five odds refresh attempts already used in the last 24 hours')
+            if not window['remaining']:raise BudgetExceeded('Today\'s NHL odds refresh allowance is used; resets at midnight Pacific time')
             if window['in_progress'] or window['needs_resume']:raise BudgetExceeded('A previous refresh is unfinished; check its status or resume the provider')
             async with db.Session() as session:
                 scheduled=await session.scalar(select(Fixture.id).where(Fixture.sport=='NHL',Fixture.commence_time>now(),

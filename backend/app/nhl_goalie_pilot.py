@@ -158,6 +158,21 @@ async def eligible():
             Fixture.commence_time < start+timedelta(days=1)).limit(1)))
 
 
+def failure_reason(exc):
+    """Useful failure categories without exposing HTTP exceptions or secrets."""
+    if isinstance(exc, SourceFormatError):
+        return str(exc)
+    if isinstance(exc, httpx.ReadTimeout):
+        return 'The goalie source timed out while responding; saved reports were kept. Explicit resume required.'
+    if isinstance(exc, httpx.ConnectTimeout):
+        return 'The goalie source connection timed out; saved reports were kept. Explicit resume required.'
+    if isinstance(exc, (httpx.TimeoutException, TimeoutError)):
+        return 'The goalie source check exceeded its time limit; saved reports were kept. Explicit resume required.'
+    if isinstance(exc, (httpx.NetworkError, httpx.ProtocolError)):
+        return 'The goalie source connection failed; saved reports were kept. Explicit resume required.'
+    return 'Source collection interrupted or failed; explicit resume required'
+
+
 async def collect(*, manual=False, transport=None, admission=None):
     if 'NHL' not in settings.active_sports or not manual and not await eligible():
         return {'status': 'idle', 'mode': 'shadow'}
@@ -190,7 +205,7 @@ async def collect(*, manual=False, transport=None, admission=None):
     except (Exception, asyncio.CancelledError) as exc:
         # SourceFormatError text is authored locally. Never persist arbitrary
         # request exceptions, response bodies, cookies or redirect locations.
-        reason = str(exc) if isinstance(exc, SourceFormatError) else 'Source collection interrupted or failed; explicit resume required'
+        reason = failure_reason(exc)
         async with db.Session.begin() as session:
             row = await session.get(ProviderState, CONTROL, with_for_update=True)
             if row and row.info.get('attempt_id') == admission['attempt_id']:

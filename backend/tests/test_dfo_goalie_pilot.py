@@ -165,6 +165,42 @@ async def test_limits_are_atomic_and_start_pause_resume_cannot_extend_or_reset_t
     with pytest.raises(BudgetExceeded):await pilot.control('resume')
 
 
+async def test_read_timeout_keeps_reports_and_budget_until_explicit_bounded_recovery(database,monkeypatch):
+    at=now();fixture=await seed(database,at)
+    monkeypatch.setattr(pilot,'now',lambda:at)
+    await pilot.control('start')
+    await pilot.collect(manual=True,transport=transport(at,[]))
+    async with database() as session:
+        before=await pilot.status(session)
+        original_report=deepcopy((await session.get(ProviderState,'dfo:'+fixture.id)).info)
+    later=at+timedelta(minutes=11)
+    monkeypatch.setattr(pilot,'now',lambda:later)
+    calls=[]
+    def timeout(request):
+        calls.append(request)
+        raise httpx.ReadTimeout('secret=https://user:password@example.test/private?apiKey=credential',request=request)
+    assert (await pilot.collect(manual=True,transport=httpx.MockTransport(timeout)))['status']=='failed'
+    with pytest.raises(BudgetExceeded):await pilot.collect(manual=True,transport=httpx.MockTransport(timeout))
+    async with database() as session:
+        failed=await pilot.status(session)
+        assert 'timed out while responding' in failed['reason']
+        assert all(secret not in json.dumps(failed) for secret in ('password','apiKey','credential','example.test'))
+        assert failed['bytes_reserved_today']==before['bytes_reserved_today']+pilot.MAX_WIRE
+        assert (await session.get(ProviderState,'dfo:'+fixture.id)).info==original_report
+    assert len(calls)==1
+    later+=timedelta(minutes=11)
+    await pilot.control('resume')
+    assert (await pilot.collect(manual=True,transport=transport(at,[])))['status']=='succeeded'
+    async with database() as session:
+        recovered=await pilot.status(session)
+        assert recovered['expires_at']==before['expires_at']
+        assert recovered['requests_reserved_today']==before['requests_reserved_today']+2
+        assert recovered['bytes_reserved_today']>before['bytes_reserved_today']+pilot.MAX_WIRE
+        assert recovered['last_failure']['reason']==failed['reason']
+        assert await session.scalar(select(func.count()).select_from(ProviderCall))==0
+        assert (await session.get(Fixture,fixture.id)).metrics==fixture.metrics
+
+
 async def test_etag_304_reuses_valid_facts_and_deduplicates_evidence(database,monkeypatch):
     at=now();fixture=await seed(database,at);calls=[]
     monkeypatch.setattr(pilot,'now',lambda:at)

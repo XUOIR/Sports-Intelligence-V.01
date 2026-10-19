@@ -44,6 +44,9 @@ class Limits:
             # The control row serializes admissions across providers and instances.
             await session.execute(insert(RuntimeLimit).values(key='control:paid',used=0).on_conflict_do_nothing())
             control=await session.get(RuntimeLimit,'control:paid',with_for_update=True)
+            # Use one admission instant for the period, ledger and credit keys,
+            # including requests that waited for the lock across midnight.
+            at=now()
             circuit=await session.get(RuntimeLimit,f'circuit:{provider}')
             if provider in PAID and control.used:
                 raise BudgetExceeded('Paid requests paused by the operator')
@@ -52,11 +55,11 @@ class Limits:
             if request_id and await session.get(ProviderCall,request_id):
                 raise BudgetExceeded('This paid request was already attempted; automatic repetition disabled')
             if provider=='odds':
-                window=await self.odds_window(session)
+                window=await self.odds_window(session,at=at)
                 if window['in_progress'] or window['needs_resume']:
                     raise BudgetExceeded('A previous odds refresh is unfinished; check its status before another request')
                 if not window['remaining']:
-                    raise BudgetExceeded('The five-refresh limit for the rolling 24-hour window has been reached')
+                    raise BudgetExceeded('Today\'s odds refresh limit has been reached; resets at midnight Pacific time')
             if request_id:
                 admitted=await session.execute(insert(ProviderCall).values(id=request_id,provider=provider,
                     fixture_id=fixture_id,units=cost,reserved_usd=usd,status='STARTED',response_metadata={},created_at=at,updated_at=at)
@@ -93,18 +96,23 @@ class Limits:
                 row.status,row.error_category,row.updated_at=status,category,now()
                 row.response_metadata={**row.response_metadata,**(metadata or {})}
 
-    async def odds_window(self,session=None):
+    async def odds_window(self,session=None,*,at=None):
         if session is None:
-            async with db.Session() as opened:return await self.odds_window(opened)
-        at=now();cutoff=at-timedelta(hours=24)
+            async with db.Session() as opened:return await self.odds_window(opened,at=at)
+        at=aware(at) if at is not None else now()
+        start=at.replace(hour=0,minute=0,second=0,microsecond=0,fold=0)
+        reset=start+timedelta(days=1)
         rows=(await session.scalars(select(ProviderCall).where(ProviderCall.provider=='odds',or_(
-            ProviderCall.created_at>cutoff,ProviderCall.status=='STARTED',and_(ProviderCall.status=='SUCCEEDED',
+            and_(ProviderCall.created_at>=start,ProviderCall.created_at<reset),ProviderCall.status=='STARTED',and_(ProviderCall.status=='SUCCEEDED',
                 ProviderCall.fixture_id.like('odds-refresh:%')))).order_by(ProviderCall.created_at))).all()
-        recent=[r for r in rows if aware(r.created_at)>cutoff]
+        recent=[r for r in rows if start<=aware(r.created_at)<reset]
         pending=[r for r in rows if r.status=='STARTED' or r.status=='SUCCEEDED' and r.fixture_id and r.fixture_id.startswith('odds-refresh:') and r.response_metadata.get('odds_sync_status')!='complete']
+        # Retain the existing environment name for deployed configurations.
+        # It now caps attempts per Pacific calendar day, not a rolling window.
         maximum=settings.odds_refreshes_24h
-        next_at=aware(recent[len(recent)-maximum].created_at)+timedelta(hours=24) if maximum and len(recent)>=maximum else None
+        next_at=reset if maximum and len(recent)>=maximum else None
         return {'limit':maximum,'used':len(recent),'remaining':max(0,maximum-len(recent)),
+            'period':'calendar_day','timezone':str(start.tzinfo),'reset_at':reset,'as_of':at,
             'next_available_at':next_at,'credit_cost':3,'mode':'manual',
             'in_progress':any(at-aware(r.created_at)<=timedelta(seconds=60) for r in pending),
             'needs_resume':any(at-aware(r.created_at)>timedelta(seconds=60) for r in pending),
