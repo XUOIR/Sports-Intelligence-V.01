@@ -83,9 +83,10 @@ Source reuse terms remain unverified; this test is not a claimed API licence.
   migration/pre-deploy stage completed, and `/health/live` and `/health/ready`
   returned HTTP 200. No schema migration or service-plan change was required.
 - The frontend's initial collector release on the same commit reached live;
-  deploy `dep-dbaneics728c738rfoo0`. A final display-only refinement preserves
-  the gradient heading and describes a started game without claiming when the
-  report was first observed. Its release is recorded after verification below.
+  deploy `dep-dbaneics728c738rfoo0`. The final display-only refinement is also
+  live on commit `f7e14238c4c4355ac0a913e5351fd9c115b617f7`, deploy
+  `dep-dbanil49v7es7397irrg`. It preserves the gradient heading and describes
+  a started game without claiming when the report was first observed.
 - The requested bounded pilot was activated through the authorized project
   connection at **October 18, 6:53:33 p.m. PT**, with an audit entry. The original
   deadline is **October 21, 6:53:33 p.m. PT**. The stored deadline was formatted
