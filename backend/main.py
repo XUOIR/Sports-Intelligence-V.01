@@ -162,6 +162,21 @@ async def sport_performance(sport:str='NHL',session=Depends(database)):
     if sport == 'NHL':
         from app.nhl_paper import summary
         result['paper'] = await summary(session)
+        from app.nhl_forward_metrics import cohort
+        from app.nhl_starter_validation import summary as starter_summary
+        from app.nhl_candidate_model import load_bundle as load_candidate
+        from app.nhl_candidate import version as candidate_version
+        result['forward_validation'] = {'baseline': await cohort(session,result['paper']['model_version']),
+            'starters': await starter_summary(session), 'candidate':None, 'candidate_info':None}
+        try:
+            candidate,digest = load_candidate()
+        except (OSError,ValueError):
+            result['forward_validation']['candidate_error'] = 'The candidate integrity check is unavailable; its collection remains blocked.'
+        else:
+            result['forward_validation']['candidate'] = await cohort(session,candidate_version(digest))
+            result['forward_validation']['candidate_info'] = {
+                'created_at':aware(candidate['created_at']).isoformat(),'features':candidate['features'],
+                'research':candidate['research'], 'approved_for_wagers':False}
     return result
 
 @app.get('/operations',dependencies=[Depends(authorize)])

@@ -224,6 +224,14 @@ async def save_reports(facts, observed, digest, etag, admission, wire):
             previous = await session.get(ProviderState, key)
             if len(rows) != 1:
                 if previous:
+                    missing = {**previous.info, 'missing_from_page': True, 'checked_at': observed.isoformat()}
+                    if not previous.info.get('missing_from_page'):
+                        session.add(Evidence(fixture_id=fixture.id, kind='nhl_goalie_report', source_at=observed,
+                            observed_at=observed, payload=missing))
+                        changes += 1
+                    session.add(Evidence(fixture_id=fixture.id, kind='nhl_goalie_observation', source_at=observed,
+                        observed_at=observed, payload={'contract':CONTRACT,'fixture_start_at':aware(fixture.commence_time).isoformat(),
+                            'missing_from_page':True,'fingerprint':previous.info.get('fingerprint'),'body_sha256':digest}))
                     previous.info = {**previous.info, 'missing_from_page': True, 'checked_at': observed.isoformat()}
                 continue
             unmatched -= 1
@@ -245,6 +253,12 @@ async def save_reports(facts, observed, digest, etag, admission, wire):
                         'names': fixture.metrics.get('goalie_confirmations'), 'at': fixture.metrics.get('confirmed_at'),
                         'method': fixture.metrics.get('starter_confirmation_method')}}))
                 changes += 1
+            # A small receipt records unchanged rechecks without creating a new
+            # source revision. Future checkpoint grading needs the actual check
+            # times, not just the first time a goalie name/status changed.
+            session.add(Evidence(fixture_id=fixture.id, kind='nhl_goalie_observation', source_at=observed,
+                observed_at=observed, payload={'contract':CONTRACT,'fixture_start_at':aware(fixture.commence_time).isoformat(),
+                    'missing_from_page':False,'fingerprint':fingerprint,'body_sha256':digest}))
             await session.execute(insert(ProviderState).values(provider=key, observed_at=observed, info=info)
                 .on_conflict_do_update(index_elements=[ProviderState.provider], set_={'observed_at': observed, 'info': info}))
             saved += 1

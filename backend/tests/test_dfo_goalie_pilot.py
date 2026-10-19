@@ -179,7 +179,8 @@ async def test_etag_304_reuses_valid_facts_and_deduplicates_evidence(database,mo
     async with database() as session:
         report=await session.get(ProviderState,'dfo:'+fixture.id)
         assert aware(report.observed_at)==at+timedelta(minutes=11) and aware(report.info['first_observed_at'])==at
-        assert await session.scalar(select(func.count()).select_from(Evidence))==1
+        assert await session.scalar(select(func.count()).select_from(Evidence).where(Evidence.kind=='nhl_goalie_report'))==1
+        assert await session.scalar(select(func.count()).select_from(Evidence).where(Evidence.kind=='nhl_goalie_observation'))==2
         assert (await pilot.status(session))['requests_reserved_today']==3
 
 
@@ -195,7 +196,7 @@ async def test_retraction_and_missing_report_remain_visible_without_rewriting_ma
         saved=await session.get(Fixture,fixture.id)
         assert saved.metrics['goalie_confirmations']['home']=='Different Starter'
         assert (await pilot.detail(session,saved))['sides']['home']['comparison']=='source_unconfirmed'
-        assert await session.scalar(select(func.count()).select_from(Evidence))==2
+        assert await session.scalar(select(func.count()).select_from(Evidence).where(Evidence.kind=='nhl_goalie_report'))==2
     monkeypatch.setattr(pilot,'now',lambda:at+timedelta(minutes=22))
     await pilot.collect(manual=True,transport=transport(at,calls,body=html(at,[])))
     async with database() as session:
@@ -253,6 +254,32 @@ async def test_official_ids_remain_identity_references_without_renewing_stale_st
         assert report['sides']['home']['identity_source']=='saved_goalie_history'
         assert aware((await session.get(ProviderState,CACHE_KEY)).observed_at)==at-timedelta(days=3)
         assert saved.gates=={} and saved.metrics=={**fixture.metrics,'nhl_goalie_comparison':{}}
+
+
+async def test_unchanged_source_receipts_prove_actual_checkpoint_freshness(database,monkeypatch):
+    from app import nhl_starter_validation as checker
+    at=now();fixture=await seed(database,at)
+    monkeypatch.setattr(pilot,'now',lambda:at)
+    await pilot.control('start')
+    await pilot.collect(manual=True,transport=transport(at,[]))
+    for minute in (89,119):
+        monkeypatch.setattr(pilot,'now',lambda minute=minute:at+timedelta(minutes=minute))
+        await pilot.collect(manual=True,transport=transport(at,[]))
+    async with database.begin() as session:
+        saved=await session.get(Fixture,fixture.id);saved.final_home_win=True
+    monkeypatch.setattr(checker,'now',lambda:at+timedelta(hours=5))
+    payload={'id':int(fixture.id[4:]),'gameType':2,'gameState':'OFF','startTimeUTC':aware(fixture.commence_time).isoformat(),
+        'homeTeam':{'abbrev':'MTL'},'awayTeam':{'abbrev':'TOR'},'playerByGameStats':{
+            side+'Team':{'goalies':[{'playerId':8480001+i,'name':{'default':side+' Starter'},'starter':True}]}
+            for i,side in enumerate(('home','away'))}}
+    def official(request):
+        return httpx.Response(200,headers={'content-type':'application/json'},stream=httpx.ByteStream(json.dumps(payload).encode()))
+    assert (await checker.verify_fixture(fixture.id,transport=httpx.MockTransport(official)))['status']=='verified'
+    async with database() as session:
+        result=await checker.summary(session)
+        assert result['at_t30']['correct']==2 and result['last_pregame']['correct']==2
+        assert await session.scalar(select(func.count()).select_from(Evidence).where(Evidence.kind=='nhl_goalie_report'))==1
+        assert await session.scalar(select(func.count()).select_from(Evidence).where(Evidence.kind=='nhl_goalie_observation'))==3
 
 
 async def test_initial_queued_check_can_observe_postgame_then_regular_schedule_stays_idle(database,monkeypatch):

@@ -1,0 +1,301 @@
+{
+  "contract": "nhl-xg-paper-v1",
+  "features": [
+    "rating_difference",
+    "rest_difference",
+    "back_to_back_difference",
+    "five_on_five_share_difference",
+    "team_goaltending_form_difference"
+  ],
+  "mode": "paper_only",
+  "approved_for_wagers": false,
+  "created_at": "2026-10-19T20:33:44.222419+00:00",
+  "base_model_sha256": "617e76ac7eda011241cd396ca45b0a80c97d62f2d70c30294c4253cd43667756",
+  "fit": {
+    "center": [
+      -0.001894854885988663,
+      0.18477457501847747,
+      -0.10532150776053215,
+      -0.001150583142682565,
+      -0.006377414645354399
+    ],
+    "scale": [
+      0.1964386810324635,
+      1.0865387303719019,
+      0.4425549728833,
+      0.07224763381146103,
+      0.42923743366651096
+    ],
+    "coefficients": [
+      0.12338313515849356,
+      0.4079786189799733,
+      -0.049028018856776524,
+      -0.16626746006390525,
+      0.14679242936579973,
+      0.0016130853357482363
+    ],
+    "penalty": 1.0,
+    "converged": true
+  },
+  "calibration": {
+    "center": [
+      0.0
+    ],
+    "scale": [
+      1.0
+    ],
+    "coefficients": [
+      0.058033035462839534,
+      0.9103219607564162
+    ],
+    "penalty": 0.1,
+    "converged": true
+  },
+  "research": {
+    "classification": "retrospective_exploration_not_production_validation",
+    "plan": {
+      "contract": "nhl-xg-goaltending-research-v1",
+      "target": "home_final_winner_including_ot_so",
+      "fit_seasons": [
+        2018,
+        2019,
+        2020,
+        2021
+      ],
+      "selection_seasons": [
+        2022
+      ],
+      "calibration_seasons": [
+        2023
+      ],
+      "test_seasons": [
+        2024,
+        2025
+      ],
+      "elo": {
+        "k": 10,
+        "home_points": 35,
+        "carry": 0.75
+      },
+      "rolling_games": 10,
+      "minimum_prior_stat_games": 5,
+      "goaltending_prior_seconds": 28800,
+      "penalties": [
+        1.0,
+        10.0,
+        100.0
+      ],
+      "selection": "brier_then_log_loss_then_declared_order",
+      "features": [
+        "rating_difference",
+        "rest_difference",
+        "back_to_back_difference",
+        "five_on_five_share_difference",
+        "team_goaltending_form_difference"
+      ],
+      "lineup": "prior team goalie appearances only; no eventual starter from target game",
+      "historical_sources": "downloaded now; historical point-in-time source versions not established",
+      "prior_research": "these test seasons have been examined in earlier team-only research",
+      "progression": "Brier and log loss must beat the same-game team-only comparator; uncertainty reported",
+      "approval": false,
+      "paid_requests": 0,
+      "production_writes": 0
+    },
+    "partitions": {
+      "fit": 4188,
+      "selection": 1224,
+      "calibration": 1227,
+      "test": 2446
+    },
+    "scores": {
+      "team_only": {
+        "games": 2446,
+        "brier": 0.2424801725600659,
+        "log_loss": 0.6777039116512972,
+        "winner_accuracy": 0.5629599345870809,
+        "mean_home_probability": 0.5395448530754423,
+        "actual_home_win_rate": 0.544153720359771,
+        "minimum_probability": 0.22967828412202282,
+        "maximum_probability": 0.8673114622392336
+      },
+      "xg_goaltending": {
+        "games": 2446,
+        "brier": 0.24101491112943826,
+        "log_loss": 0.674569743090576,
+        "winner_accuracy": 0.5699100572363042,
+        "mean_home_probability": 0.5411451591220799,
+        "actual_home_win_rate": 0.544153720359771,
+        "minimum_probability": 0.21300129760585523,
+        "maximum_probability": 0.8592963323075754
+      }
+    },
+    "paired_improvement": {
+      "metric": "reference_brier_minus_model_brier",
+      "estimate": 0.0014652614306276052,
+      "percentile_95_low": 0.0005045657139227633,
+      "percentile_95_high": 0.0024611577387489625,
+      "clusters": 51,
+      "cluster_unit": "season_iso_calendar_week",
+      "replications": 2000,
+      "seed": 20261015,
+      "interpretation": "Exploratory paired week-cluster uncertainty; not proof of a market edge."
+    },
+    "candidate_improves_both_scores": true,
+    "uncertainty_supports_progression": true,
+    "calibration": {
+      "team_only": [
+        {
+          "lower_bin": 0.2,
+          "upper_bin": 0.3,
+          "games": 27,
+          "mean_probability": 0.2698524347413586,
+          "observed_home_win_rate": 0.25925925925925924,
+          "wilson_low": 0.13170374561907439,
+          "wilson_high": 0.4467857131455254
+        },
+        {
+          "lower_bin": 0.3,
+          "upper_bin": 0.4,
+          "games": 161,
+          "mean_probability": 0.36444236226236165,
+          "observed_home_win_rate": 0.422360248447205,
+          "wilson_low": 0.3487455007364707,
+          "wilson_high": 0.4995936235417625
+        },
+        {
+          "lower_bin": 0.4,
+          "upper_bin": 0.5,
+          "games": 648,
+          "mean_probability": 0.4585390758040081,
+          "observed_home_win_rate": 0.49382716049382713,
+          "wilson_low": 0.45548272272473667,
+          "wilson_high": 0.5322443543248367
+        },
+        {
+          "lower_bin": 0.5,
+          "upper_bin": 0.6,
+          "games": 940,
+          "mean_probability": 0.5484939958280227,
+          "observed_home_win_rate": 0.5329787234042553,
+          "wilson_low": 0.5010153010703408,
+          "wilson_high": 0.5646736972466727
+        },
+        {
+          "lower_bin": 0.6,
+          "upper_bin": 0.7,
+          "games": 554,
+          "mean_probability": 0.6418753881209822,
+          "observed_home_win_rate": 0.628158844765343,
+          "wilson_low": 0.5871608906385288,
+          "wilson_high": 0.6673917206001474
+        },
+        {
+          "lower_bin": 0.7,
+          "upper_bin": 0.8,
+          "games": 114,
+          "mean_probability": 0.7348478306549913,
+          "observed_home_win_rate": 0.7456140350877193,
+          "wilson_low": 0.6585681933372238,
+          "wilson_high": 0.8166465618128198
+        },
+        {
+          "lower_bin": 0.8,
+          "upper_bin": 0.9,
+          "games": 2,
+          "mean_probability": 0.8380898236214813,
+          "observed_home_win_rate": 1.0,
+          "wilson_low": 0.34238022750666547,
+          "wilson_high": 1.0
+        }
+      ],
+      "xg_goaltending": [
+        {
+          "lower_bin": 0.2,
+          "upper_bin": 0.3,
+          "games": 34,
+          "mean_probability": 0.27052762120791646,
+          "observed_home_win_rate": 0.2647058823529412,
+          "wilson_low": 0.1460119067721199,
+          "wilson_high": 0.4311714128294419
+        },
+        {
+          "lower_bin": 0.3,
+          "upper_bin": 0.4,
+          "games": 167,
+          "mean_probability": 0.3617515062117962,
+          "observed_home_win_rate": 0.4431137724550898,
+          "wilson_low": 0.3698928772722597,
+          "wilson_high": 0.518892900306815
+        },
+        {
+          "lower_bin": 0.4,
+          "upper_bin": 0.5,
+          "games": 622,
+          "mean_probability": 0.45731280424353177,
+          "observed_home_win_rate": 0.477491961414791,
+          "wilson_low": 0.43849666587582764,
+          "wilson_high": 0.5167635687964455
+        },
+        {
+          "lower_bin": 0.5,
+          "upper_bin": 0.6,
+          "games": 926,
+          "mean_probability": 0.5477569206384807,
+          "observed_home_win_rate": 0.5356371490280778,
+          "wilson_low": 0.5034337019877312,
+          "wilson_high": 0.5675461401927918
+        },
+        {
+          "lower_bin": 0.6,
+          "upper_bin": 0.7,
+          "games": 554,
+          "mean_probability": 0.6436605138742967,
+          "observed_home_win_rate": 0.628158844765343,
+          "wilson_low": 0.5871608906385288,
+          "wilson_high": 0.6673917206001474
+        },
+        {
+          "lower_bin": 0.7,
+          "upper_bin": 0.8,
+          "games": 137,
+          "mean_probability": 0.736319816191275,
+          "observed_home_win_rate": 0.7518248175182481,
+          "wilson_low": 0.673288484052733,
+          "wilson_high": 0.8166240784679683
+        },
+        {
+          "lower_bin": 0.8,
+          "upper_bin": 0.9,
+          "games": 6,
+          "mean_probability": 0.8159010498156474,
+          "observed_home_win_rate": 0.6666666666666666,
+          "wilson_low": 0.29999331513839955,
+          "wilson_high": 0.9032285888942164
+        }
+      ]
+    },
+    "market_edge_demonstrated": false,
+    "approved_for_wagers": false,
+    "limitations": [
+      "Historical source vintages not verified; reconstructed features are not original pregame observations.",
+      "Test seasons were examined in earlier team-only research; they are not newly untouched holdouts.",
+      "Team goaltending form is not an individual named starter adjustment.",
+      "No historical PlayNow prices; prospective matched-price grading remains necessary."
+    ]
+  },
+  "source_manifest_sha256": "245f3e56b51eebd48b4ff26deb7aa678678a68ad2830f80af2eb23711ee75d37",
+  "collection": {
+    "threshold": 0.03,
+    "quote_max_age_seconds": 300,
+    "units": 1,
+    "market": "h2h_final_including_ot_so",
+    "operational_checkpoint_days": 14,
+    "operational_checkpoint_pairs": 100,
+    "real_money_release": "Separate validation and review required; never automatic"
+  },
+  "inference_code_sha256": {
+    "nhl_candidate_features.py": "98596c44b8ed50246593714db8b1e06a83307dfa9ab5009d90f153428c98053a",
+    "nhl_candidate_model.py": "c7191f1aac8fe8cfa7dc1070a764e5efc9b2f5bb8eeb98065d7fd7d1597106d6",
+    "nhl_candidate.py": "2747a10c61ce07641b94b2df7c97303d7541b0fc27a04612a573eead8c8b2d46"
+  }
+}

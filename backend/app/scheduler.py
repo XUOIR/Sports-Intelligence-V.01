@@ -89,10 +89,18 @@ def start():
     from .matches import tick as scores_tick
     from .nhl_paper import cycle as paper_cycle
     from .nhl_goalie_pilot import collect as goalie_pilot_collect
+    from .nhl_starter_validation import cycle as starter_validation
+    from .nhl_candidate import collect as candidate_collect
     scheduler.add_job(scores_tick,'interval',seconds=30,next_run_time=now(),id='nhl-scores')
     # Idle until explicitly started. The durable pilot deadline expires after
     # 72 hours; every network admission retains its own shared ten-minute cap.
     scheduler.add_job(guarded, 'interval', minutes=1, args=['nhl-goalie-pilot',goalie_pilot_collect,55], id='nhl-goalie-pilot')
+    # Actual starters are checked once after a reconciled final. This source
+    # audit has independent request/byte caps and cannot confirm a pregame lineup.
+    scheduler.add_job(guarded, 'interval', minutes=15, args=['nhl-starter-validation',starter_validation,120], id='nhl-starter-validation')
+    # Separate immutable paper cohort. Reads saved inputs/prices only; no paid
+    # request, goalie confirmation, model approval or bankroll mutation.
+    scheduler.add_job(guarded, 'interval', minutes=1, args=['nhl-xg-candidate',candidate_collect,55], id='nhl-xg-candidate')
     scheduler.add_job(guarded, CronTrigger(hour=4, minute=0, timezone=PACIFIC), args=["nhl-daily",daily_nhl,1800], id="nhl-daily")
     scheduler.add_job(guarded, "interval", hours=1, args=["nhl-refresh",refresh_nhl], id="nhl-refresh")
     if settings.nhl_advanced_enabled:

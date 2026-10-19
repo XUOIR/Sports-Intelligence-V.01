@@ -248,13 +248,16 @@ def build_batch(team_path, goalie_path, day, reference, sources):
         row = rolling(goalies, day, goalie=player)
         row.update(player_id=player, name=last["name"][:100], latest_team=last["playerTeam"], starter_confirmed=False)
         goalie_windows[player] = row
+    from .nhl_candidate_features import team_goaltending
+    goalie_teams = {team: team_goaltending(goalies, day, team, 2026) for team in team_windows}
     return {"schema_version": 1, "source": "MoneyPuck.com", "source_url": "https://moneypuck.com/data.htm",
             "classification": "descriptive_statistics", "as_of_date": day.isoformat(),
             "observed_at": now().isoformat(), "verified_through": reference["currentDate"],
             "latest_game_date": max(r["gameDate"] for r in teams), "sources": sources,
             "team_games": len(source_team_games), "verified_games_previous_day": official["completed_games"],
             "historical_identity_rows_quarantined": quarantined, "teams": team_windows, "goalies": goalie_windows,
-            "team_context":contexts,"model_approved_by_import": False, "starters_confirmed_by_import": False}
+            "team_context":contexts,"team_goaltending":goalie_teams,
+            "model_approved_by_import": False, "starters_confirmed_by_import": False}
 
 
 async def record_import_state(result, acquisition):
